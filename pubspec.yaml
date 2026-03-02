@@ -1,0 +1,65 @@
+name: memorization_app
+description: "文章暗記サポートアプリ - テキスト登録・読み上げ・穴埋め練習・音声暗記確認"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # 音声認識（Phase 1 コア）
+  speech_to_text: ^7.0.0
+  permission_handler: ^11.0.0
+
+  # 音声読み上げ（Phase 1 コア）
+  flutter_tts: ^4.2.0
+
+  # データ保存
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # 状態管理・画面遷移
+  flutter_riverpod: ^2.0.0
+  go_router: ^14.0.0
+
+  # UI
+  google_fonts: ^6.0.0
+
+  # ユーティリティ
+  diff_match_patch: ^0.4.1
+  collection: ^1.18.0
+
+  # UUID生成
+  uuid: ^4.0.0
+
+  # Phase 2: OCR
+  image_picker: ^1.0.0
+  image_cropper: ^8.0.0
+  file_picker: ^8.0.0
+  google_mlkit_text_recognition: ^0.14.0
+  pdfx: ^2.6.0
+
+  # Phase 2: オフライン音声認識（sherpa-onnx + SenseVoice）
+  sherpa_onnx: ^1.10.0
+  record: ^5.0.0
+  path_provider: ^2.1.0
+  http: ^1.2.0
+
+dependency_overrides:
+  record_linux: ^1.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  hive_generator: ^2.0.0
+  build_runner: ^2.4.0
+
+flutter:
+  uses-material-design: true
