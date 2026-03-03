@@ -56,6 +56,18 @@ class Script extends HiveObject {
   @HiveField(16)
   late double easeFactor; // SM-2 易しさ係数
 
+  @HiveField(17)
+  late String reviewPace; // 'relaxed' / 'normal' / 'intensive' / 'daily'
+
+  @HiveField(18)
+  DateTime? targetDate; // 本番日（null = 未設定、SM-2モード）
+
+  @HiveField(19)
+  late List<DateTime> generatedSchedule; // 本番日逆算スケジュール
+
+  @HiveField(20)
+  late int scheduleIndex; // generatedSchedule 内の現在位置
+
   Script({
     required this.id,
     required this.title,
@@ -74,10 +86,15 @@ class Script extends HiveObject {
     this.nextReviewAt,
     this.intervalDays = 0.0,
     this.easeFactor = 2.5,
+    this.reviewPace = 'normal',
+    this.targetDate,
+    List<DateTime>? generatedSchedule,
+    this.scheduleIndex = 0,
   })  : createdAt = createdAt ?? DateTime.now(),
         lastPracticedAt = lastPracticedAt ?? DateTime.now(),
         clozeWords = clozeWords ?? [],
-        tags = tags ?? [];
+        tags = tags ?? [],
+        generatedSchedule = generatedSchedule ?? [];
 
   double get progressPercent {
     switch (currentLevel) {
@@ -107,4 +124,12 @@ class Script extends HiveObject {
     }
     return DateTime.now().difference(nextReviewAt!);
   }
+
+  bool get hasTargetDate => targetDate != null;
+
+  int get daysUntilTarget =>
+      hasTargetDate ? targetDate!.difference(DateTime.now()).inDays : -1;
+
+  bool get isTargetDateMode =>
+      hasTargetDate && generatedSchedule.isNotEmpty;
 }

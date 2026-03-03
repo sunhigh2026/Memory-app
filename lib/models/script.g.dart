@@ -39,13 +39,19 @@ class ScriptAdapter extends TypeAdapter<Script> {
       nextReviewAt: fields[14] as DateTime?,
       intervalDays: (fields[15] as double?) ?? 0.0,
       easeFactor: (fields[16] as double?) ?? 2.5,
+      reviewPace: fields[17] as String? ?? 'normal',
+      targetDate: fields[18] as DateTime?,
+      generatedSchedule: fields[19] != null
+          ? (fields[19] as List).cast<DateTime>()
+          : [],
+      scheduleIndex: (fields[20] as int?) ?? 0,
     );
   }
 
   @override
   void write(BinaryWriter writer, Script obj) {
     writer
-      ..writeByte(17)
+      ..writeByte(21)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -79,7 +85,15 @@ class ScriptAdapter extends TypeAdapter<Script> {
       ..writeByte(15)
       ..write(obj.intervalDays)
       ..writeByte(16)
-      ..write(obj.easeFactor);
+      ..write(obj.easeFactor)
+      ..writeByte(17)
+      ..write(obj.reviewPace)
+      ..writeByte(18)
+      ..write(obj.targetDate)
+      ..writeByte(19)
+      ..write(obj.generatedSchedule)
+      ..writeByte(20)
+      ..write(obj.scheduleIndex);
   }
 
   @override

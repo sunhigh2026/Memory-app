@@ -83,15 +83,40 @@ class ProgressRepository {
       script.currentLevel++;
     }
 
-    // SM-2 間隔反復スケジュール更新
-    final srResult = SpacedRepetition.calculate(
-      score: score,
-      currentInterval: script.intervalDays,
-      currentEaseFactor: script.easeFactor,
-    );
-    script.intervalDays = srResult.intervalDays;
-    script.easeFactor = srResult.easeFactor;
-    script.nextReviewAt = srResult.nextReviewAt;
+    // スケジュール更新
+    if (script.isTargetDateMode) {
+      // 本番日モード: generatedSchedule に従う
+      if (score >= 85) {
+        script.scheduleIndex = (script.scheduleIndex + 1)
+            .clamp(0, script.generatedSchedule.length - 1);
+      } else {
+        // 不合格: 翌日を臨時復習日として挿入
+        final tomorrow = DateTime.now().add(const Duration(days: 1));
+        final tomorrowDate =
+            DateTime(tomorrow.year, tomorrow.month, tomorrow.day);
+        if (script.scheduleIndex + 1 < script.generatedSchedule.length) {
+          script.generatedSchedule
+              .insert(script.scheduleIndex + 1, tomorrowDate);
+        } else {
+          script.generatedSchedule.add(tomorrowDate);
+        }
+      }
+      if (script.scheduleIndex < script.generatedSchedule.length) {
+        script.nextReviewAt =
+            script.generatedSchedule[script.scheduleIndex];
+      }
+    } else {
+      // SM-2 モード（ペース係数適用）
+      final srResult = SpacedRepetition.calculate(
+        score: score,
+        currentInterval: script.intervalDays,
+        currentEaseFactor: script.easeFactor,
+        pace: script.reviewPace,
+      );
+      script.intervalDays = srResult.intervalDays;
+      script.easeFactor = srResult.easeFactor;
+      script.nextReviewAt = srResult.nextReviewAt;
+    }
 
     await script.save();
   }

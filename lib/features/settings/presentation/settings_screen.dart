@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/data/app_settings_repository.dart';
+import '../../scripts/data/scripts_repository.dart';
 import '../../tts/data/tts_dictionary_repository.dart';
 import '../../voice_check/data/speech_engine_type.dart';
 import '../../voice_check/data/model_download_service.dart';
@@ -230,6 +231,31 @@ class SettingsScreen extends ConsumerWidget {
             _buildModelManagementTile(context, ref),
           ],
           const SizedBox(height: 16),
+          // 復習ペース
+          _SectionHeader(title: '復習'),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[200]!),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('デフォルト復習ペース', style: TextStyle(fontSize: 16)),
+                const SizedBox(height: 8),
+                _ReviewPaceSelector(ref: ref),
+                const SizedBox(height: 8),
+                Text(
+                  '新規テキストに適用されます。各テキストの詳細画面で個別に変更できます。\n'
+                  '本番日が設定されているテキストは本番日スケジュールが優先されます。',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           // アプリ情報
           _SectionHeader(title: 'アプリ情報'),
           Container(
@@ -255,6 +281,45 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ReviewPaceSelector extends StatelessWidget {
+  final WidgetRef ref;
+
+  const _ReviewPaceSelector({required this.ref});
+
+  @override
+  Widget build(BuildContext context) {
+    final settingsRepo = ref.watch(appSettingsRepositoryProvider);
+    final currentPace = settingsRepo.getDefaultReviewPace();
+
+    return SegmentedButton<String>(
+      segments: const [
+        ButtonSegment(value: 'relaxed', label: Text('ゆっくり')),
+        ButtonSegment(value: 'normal', label: Text('ふつう')),
+        ButtonSegment(value: 'intensive', label: Text('しっかり')),
+        ButtonSegment(value: 'daily', label: Text('毎日')),
+      ],
+      selected: {currentPace},
+      onSelectionChanged: (newSelection) async {
+        final pace = newSelection.first;
+        await settingsRepo.setDefaultReviewPace(pace);
+        // 本番日未設定の全スクリプトに反映
+        final scripts = ref.read(scriptsListProvider);
+        for (final script in scripts) {
+          if (!script.isTargetDateMode) {
+            script.reviewPace = pace;
+            await script.save();
+          }
+        }
+        ref.read(scriptsListProvider.notifier).refresh();
+      },
+      style: const ButtonStyle(
+        textStyle: WidgetStatePropertyAll(TextStyle(fontSize: 11)),
+        visualDensity: VisualDensity.compact,
       ),
     );
   }

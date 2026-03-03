@@ -41,6 +41,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
   final Set<String> _allowedKeys = {}; // "original→recognized" 追跡用
   RealtimeMatcher? _realtimeMatcher;
   RealtimeMatchState? _realtimeState;
+  bool _isProcessing = false; // 停止処理中のガード
 
   int get _maxSeconds =>
       _mode == RecognitionMode.fullRecitation ? 300 : 60;
@@ -289,6 +290,8 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
       return;
     }
 
+    if (_isProcessing) return; // 停止処理中は開始しない
+
     final speechService = ref.read(speechRecognitionServiceProvider);
     final available = await speechService.initialize();
     if (!available) {
@@ -357,6 +360,8 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
   }
 
   Future<void> _stopRecording() async {
+    if (_isProcessing) return;
+    _isProcessing = true;
     _timer?.cancel();
     _realtimeMatcher?.reset();
     setState(() {
@@ -384,6 +389,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
     }
 
     if (_recognizedText.isEmpty) {
+      _isProcessing = false;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('音声が認識できませんでした。もう一度お試しください。')),
@@ -420,6 +426,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
         _script, result.similarityScore, 'voice', 4);
     ref.read(scriptsListProvider.notifier).refresh();
 
+    _isProcessing = false;
     setState(() {
       _matchResult = result;
       _showResult = true;

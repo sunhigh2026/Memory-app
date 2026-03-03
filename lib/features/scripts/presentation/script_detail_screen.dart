@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../data/scripts_repository.dart';
 import '../../tts/presentation/tts_player_widget.dart';
 import '../../voice_check/data/allowed_pairs_repository.dart';
+import '../../progress/domain/schedule_generator.dart';
 import '../../../models/script.dart';
 
 class ScriptDetailScreen extends ConsumerWidget {
@@ -148,6 +149,9 @@ class ScriptDetailScreen extends ConsumerWidget {
                   ],
                 ),
               ),
+            // 本番日・復習ペース
+            const SizedBox(height: 24),
+            _TargetDateSection(script: script),
             // 許容語リスト
             const SizedBox(height: 24),
             _AllowedPairsSection(scriptId: scriptId),
@@ -155,6 +159,319 @@ class ScriptDetailScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+class _TargetDateSection extends ConsumerStatefulWidget {
+  final Script script;
+
+  const _TargetDateSection({required this.script});
+
+  @override
+  ConsumerState<_TargetDateSection> createState() =>
+      _TargetDateSectionState();
+}
+
+class _TargetDateSectionState extends ConsumerState<_TargetDateSection> {
+  bool _scheduleExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final script = widget.script;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '復習スケジュール',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[600],
+          ),
+        ),
+        const SizedBox(height: 8),
+        // 復習ペース（本番日未設定時のみ有効）
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey[200]!),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '復習ペース',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(
+                      value: 'relaxed', label: Text('ゆっくり')),
+                  ButtonSegment(
+                      value: 'normal', label: Text('ふつう')),
+                  ButtonSegment(
+                      value: 'intensive', label: Text('しっかり')),
+                  ButtonSegment(
+                      value: 'daily', label: Text('毎日')),
+                ],
+                selected: {script.reviewPace},
+                onSelectionChanged: script.isTargetDateMode
+                    ? null
+                    : (newSelection) async {
+                        script.reviewPace = newSelection.first;
+                        await script.save();
+                        ref.read(scriptsListProvider.notifier).refresh();
+                      },
+                style: ButtonStyle(
+                  textStyle: WidgetStatePropertyAll(
+                    const TextStyle(fontSize: 11),
+                  ),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+              if (script.isTargetDateMode)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    '本番日スケジュールが優先されます',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        // 本番日設定
+        if (script.hasTargetDate) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: script.daysUntilTarget <= 3
+                    ? AppTheme.error.withValues(alpha: 0.4)
+                    : AppTheme.primary.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.event,
+                      size: 18,
+                      color: script.daysUntilTarget <= 3
+                          ? AppTheme.error
+                          : AppTheme.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '本番日: ${_formatDate(script.targetDate!)}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      script.daysUntilTarget > 0
+                          ? 'あと${script.daysUntilTarget}日'
+                          : script.daysUntilTarget == 0
+                              ? '今日が本番'
+                              : '本番日を過ぎています',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: script.daysUntilTarget <= 3
+                            ? AppTheme.error
+                            : AppTheme.secondary,
+                      ),
+                    ),
+                  ],
+                ),
+                if (script.generatedSchedule.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    '復習予定: 全${script.generatedSchedule.length}回のうち${script.scheduleIndex}回目',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                  ),
+                  const SizedBox(height: 8),
+                  // スケジュール展開
+                  GestureDetector(
+                    onTap: () =>
+                        setState(() => _scheduleExpanded = !_scheduleExpanded),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _scheduleExpanded
+                              ? Icons.expand_less
+                              : Icons.expand_more,
+                          size: 18,
+                          color: AppTheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _scheduleExpanded ? 'スケジュールを閉じる' : 'スケジュールを表示',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_scheduleExpanded)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Column(
+                        children: List.generate(
+                          script.generatedSchedule.length,
+                          (i) {
+                            final date = script.generatedSchedule[i];
+                            final isCompleted = i < script.scheduleIndex;
+                            final isToday = _isSameDay(date, DateTime.now());
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 2),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    isCompleted
+                                        ? Icons.check_circle
+                                        : isToday
+                                            ? Icons.radio_button_checked
+                                            : Icons.radio_button_unchecked,
+                                    size: 16,
+                                    color: isCompleted
+                                        ? AppTheme.secondary
+                                        : isToday
+                                            ? AppTheme.primary
+                                            : Colors.grey[400],
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _formatDate(date),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isToday
+                                          ? AppTheme.primary
+                                          : Colors.grey[600],
+                                      fontWeight: isToday
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                      decoration: isCompleted
+                                          ? TextDecoration.lineThrough
+                                          : null,
+                                    ),
+                                  ),
+                                  if (isToday)
+                                    Padding(
+                                      padding:
+                                          const EdgeInsets.only(left: 6),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.primary
+                                              .withValues(alpha: 0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: const Text(
+                                          '今日',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: AppTheme.primary,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                ],
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () async {
+                      script.targetDate = null;
+                      script.generatedSchedule = [];
+                      script.scheduleIndex = 0;
+                      await script.save();
+                      ref.read(scriptsListProvider.notifier).refresh();
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.error,
+                      side: BorderSide(
+                          color: AppTheme.error.withValues(alpha: 0.4)),
+                    ),
+                    child: const Text('本番日を解除'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ] else
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _pickTargetDate(context, script),
+              icon: const Icon(Icons.event, size: 18),
+              label: const Text('本番日を設定'),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _pickTargetDate(BuildContext context, Script script) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: now.add(const Duration(days: 7)),
+      firstDate: now.add(const Duration(days: 1)),
+      lastDate: now.add(const Duration(days: 365)),
+      helpText: '本番日を選択',
+    );
+    if (picked == null) return;
+
+    final schedule = ScheduleGenerator.generate(
+      startDate: now,
+      targetDate: picked,
+    );
+
+    script.targetDate = picked;
+    script.generatedSchedule = schedule;
+    script.scheduleIndex = 0;
+    // 最初のスケジュール日を nextReviewAt に設定
+    if (schedule.isNotEmpty) {
+      script.nextReviewAt = schedule[0];
+    }
+    await script.save();
+    ref.read(scriptsListProvider.notifier).refresh();
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 }
 

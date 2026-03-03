@@ -134,7 +134,7 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ),
                 SizedBox(
-                  height: 88,
+                  height: 100,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -252,7 +252,9 @@ class _ReviewDueCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final overdueDays = script.reviewOverdueDuration.inDays;
-    final isUrgent = overdueDays >= 3;
+    final hasTarget = script.hasTargetDate;
+    final targetUrgent = hasTarget && script.daysUntilTarget <= 3;
+    final isUrgent = targetUrgent || overdueDays >= 3;
     final badgeColor = isUrgent ? AppTheme.error : AppTheme.accent;
 
     return GestureDetector(
@@ -309,18 +311,40 @@ class _ReviewDueCard extends StatelessWidget {
                 ),
               ],
             ),
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.schedule, size: 14, color: badgeColor),
-                const SizedBox(width: 4),
-                Text(
-                  overdueDays == 0 ? '今日が復習日' : '$overdueDays日超過',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: badgeColor,
-                  ),
+                Row(
+                  children: [
+                    Icon(Icons.schedule, size: 14, color: badgeColor),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        overdueDays == 0 ? '今日が復習日' : '$overdueDays日超過',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: badgeColor,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
+                if (hasTarget)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      targetUrgent
+                          ? 'まもなく本番'
+                          : '本番まで${script.daysUntilTarget}日',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: targetUrgent ? AppTheme.error : AppTheme.primary,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ],

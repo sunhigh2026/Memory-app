@@ -6,8 +6,17 @@ import '../../features/voice_check/data/speech_engine_type.dart';
 class AppSettingsRepository {
   static const String boxName = 'app_settings';
   static const String _keySpeechEngine = 'speechEngine';
+  static const String _keyDefaultReviewPace = 'defaultReviewPace';
 
   Box get _box => Hive.box(boxName);
+
+  String getDefaultReviewPace() {
+    return _box.get(_keyDefaultReviewPace, defaultValue: 'normal') as String;
+  }
+
+  Future<void> setDefaultReviewPace(String pace) async {
+    await _box.put(_keyDefaultReviewPace, pace);
+  }
 
   SpeechEngineType getSpeechEngine() {
     final value = _box.get(_keySpeechEngine, defaultValue: 'native');

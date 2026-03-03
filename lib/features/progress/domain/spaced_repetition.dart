@@ -12,11 +12,29 @@ class SpacedRepetition {
     return 0; // 完全に忘れた
   }
 
+  /// 復習ペース名 → 係数
+  static double getPaceMultiplier(String pace) {
+    switch (pace) {
+      case 'relaxed':
+        return 1.3;
+      case 'normal':
+        return 1.0;
+      case 'intensive':
+        return 0.6;
+      case 'daily':
+        return 0.0; // 特殊: 常に interval=1
+      default:
+        return 1.0;
+    }
+  }
+
   /// SM-2 アルゴリズムで次回復習パラメータを算出
+  /// [pace] でペース係数を適用
   static SpacedRepetitionResult calculate({
     required double score,
     required double currentInterval,
     required double currentEaseFactor,
+    String pace = 'normal',
   }) {
     final quality = scoreToQuality(score);
 
@@ -26,7 +44,10 @@ class SpacedRepetition {
     newEaseFactor = max(1.3, newEaseFactor);
 
     double newInterval;
-    if (quality < 3) {
+    if (pace == 'daily') {
+      // 毎日モード: 常に1日
+      newInterval = 1.0;
+    } else if (quality < 3) {
       // 不合格: 間隔を1日にリセット
       newInterval = 1.0;
     } else {
@@ -37,6 +58,9 @@ class SpacedRepetition {
       } else {
         newInterval = currentInterval * newEaseFactor;
       }
+      // ペース係数を適用
+      final multiplier = getPaceMultiplier(pace);
+      newInterval = (newInterval * multiplier).ceilToDouble().clamp(1, 365);
     }
 
     final nextReviewAt = DateTime.now().add(
