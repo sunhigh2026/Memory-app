@@ -37,6 +37,10 @@ class HomeScreen extends ConsumerWidget {
         title: const Text('暗記サポート'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.bar_chart),
+            onPressed: () => context.push('/statistics'),
+          ),
+          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => context.push('/settings'),
           ),
@@ -106,6 +110,45 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
           if (allTags.isNotEmpty) const SizedBox(height: 8),
+          // 復習が必要セクション
+          Builder(builder: (context) {
+            final reviewDue = scripts
+                .where((s) => s.isReviewDue)
+                .toList()
+              ..sort((a, b) => b.reviewOverdueDuration
+                  .compareTo(a.reviewOverdueDuration));
+            if (reviewDue.isEmpty) return const SizedBox.shrink();
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: Text(
+                    '復習が必要（${reviewDue.length}件）',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textDark,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  height: 88,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: reviewDue.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 10),
+                    itemBuilder: (context, index) {
+                      return _ReviewDueCard(script: reviewDue[index]);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            );
+          }),
           // 文章リスト
           Expanded(
             child: filteredScripts.isEmpty
@@ -198,6 +241,107 @@ class _StatCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _ReviewDueCard extends StatelessWidget {
+  final Script script;
+
+  const _ReviewDueCard({required this.script});
+
+  @override
+  Widget build(BuildContext context) {
+    final overdueDays = script.reviewOverdueDuration.inDays;
+    final isUrgent = overdueDays >= 3;
+    final badgeColor = isUrgent ? AppTheme.error : AppTheme.accent;
+
+    return GestureDetector(
+      onTap: () => context.push('/detail/${script.id}'),
+      child: Container(
+        width: 150,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: badgeColor.withValues(alpha: 0.4),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: badgeColor.withValues(alpha: 0.1),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    script.title,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: _levelColor(script.currentLevel),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'L${script.currentLevel}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                Icon(Icons.schedule, size: 14, color: badgeColor),
+                const SizedBox(width: 4),
+                Text(
+                  overdueDays == 0 ? '今日が復習日' : '$overdueDays日超過',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: badgeColor,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _levelColor(int level) {
+    switch (level) {
+      case 1:
+        return AppTheme.accent;
+      case 2:
+        return AppTheme.primary;
+      case 3:
+        return AppTheme.secondary;
+      case 4:
+        return const Color(0xFFD4AF37);
+      default:
+        return AppTheme.primary;
+    }
   }
 }
 

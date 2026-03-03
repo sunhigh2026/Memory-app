@@ -36,13 +36,16 @@ class ScriptAdapter extends TypeAdapter<Script> {
               : []),
       parenthesesMode: fields[12] as String? ?? 'stripContent',
       fullTextHiragana: fields[13] as String? ?? '',
+      nextReviewAt: fields[14] as DateTime?,
+      intervalDays: (fields[15] as double?) ?? 0.0,
+      easeFactor: (fields[16] as double?) ?? 2.5,
     );
   }
 
   @override
   void write(BinaryWriter writer, Script obj) {
     writer
-      ..writeByte(14)
+      ..writeByte(17)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -70,7 +73,13 @@ class ScriptAdapter extends TypeAdapter<Script> {
       ..writeByte(12)
       ..write(obj.parenthesesMode)
       ..writeByte(13)
-      ..write(obj.fullTextHiragana);
+      ..write(obj.fullTextHiragana)
+      ..writeByte(14)
+      ..write(obj.nextReviewAt)
+      ..writeByte(15)
+      ..write(obj.intervalDays)
+      ..writeByte(16)
+      ..write(obj.easeFactor);
   }
 
   @override

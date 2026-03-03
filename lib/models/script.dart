@@ -47,6 +47,15 @@ class Script extends HiveObject {
   @HiveField(13)
   late String fullTextHiragana; // ひらがな化済みテキスト（キャッシュ）
 
+  @HiveField(14)
+  DateTime? nextReviewAt; // 次回復習日（null = 未スケジュール）
+
+  @HiveField(15)
+  late double intervalDays; // 復習間隔（日数）
+
+  @HiveField(16)
+  late double easeFactor; // SM-2 易しさ係数
+
   Script({
     required this.id,
     required this.title,
@@ -62,6 +71,9 @@ class Script extends HiveObject {
     List<String>? tags,
     this.parenthesesMode = 'stripContent',
     this.fullTextHiragana = '',
+    this.nextReviewAt,
+    this.intervalDays = 0.0,
+    this.easeFactor = 2.5,
   })  : createdAt = createdAt ?? DateTime.now(),
         lastPracticedAt = lastPracticedAt ?? DateTime.now(),
         clozeWords = clozeWords ?? [],
@@ -83,4 +95,16 @@ class Script extends HiveObject {
   }
 
   bool get isMastered => currentLevel == 4 && bestVoiceScore >= 85;
+
+  bool get isReviewDue {
+    if (nextReviewAt == null) return practiceCount > 0;
+    return DateTime.now().isAfter(nextReviewAt!);
+  }
+
+  Duration get reviewOverdueDuration {
+    if (nextReviewAt == null || DateTime.now().isBefore(nextReviewAt!)) {
+      return Duration.zero;
+    }
+    return DateTime.now().difference(nextReviewAt!);
+  }
 }

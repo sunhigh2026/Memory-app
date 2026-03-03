@@ -3,6 +3,7 @@ import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 import '../../../models/practice_session.dart';
 import '../../../models/script.dart';
+import '../domain/spaced_repetition.dart';
 
 class ProgressRepository {
   static const String _boxName = 'practice_sessions';
@@ -82,7 +83,87 @@ class ProgressRepository {
       script.currentLevel++;
     }
 
+    // SM-2 間隔反復スケジュール更新
+    final srResult = SpacedRepetition.calculate(
+      score: score,
+      currentInterval: script.intervalDays,
+      currentEaseFactor: script.easeFactor,
+    );
+    script.intervalDays = srResult.intervalDays;
+    script.easeFactor = srResult.easeFactor;
+    script.nextReviewAt = srResult.nextReviewAt;
+
     await script.save();
+  }
+
+  // --- 統計集計メソッド ---
+
+  /// 指定期間のセッション一覧
+  List<PracticeSession> getSessionsInRange(DateTime start, DateTime end) {
+    return _box.values
+        .where((s) => s.createdAt.isAfter(start) && s.createdAt.isBefore(end))
+        .toList()
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+  }
+
+  /// 日別平均スコア（過去N日）
+  Map<DateTime, double> getDailyAverageScores({int days = 30}) {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day - days);
+    final sessions = getSessionsInRange(start, now);
+
+    final grouped = <DateTime, List<double>>{};
+    for (final s in sessions) {
+      final dayKey = DateTime(s.createdAt.year, s.createdAt.month, s.createdAt.day);
+      grouped.putIfAbsent(dayKey, () => []).add(s.score);
+    }
+
+    return grouped.map((date, scores) =>
+        MapEntry(date, scores.reduce((a, b) => a + b) / scores.length));
+  }
+
+  /// 日別学習時間（過去N日、秒単位）
+  Map<DateTime, int> getDailyStudySeconds({int days = 7}) {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day - days);
+    final sessions = getSessionsInRange(start, now);
+
+    final grouped = <DateTime, int>{};
+    for (final s in sessions) {
+      final dayKey = DateTime(s.createdAt.year, s.createdAt.month, s.createdAt.day);
+      grouped[dayKey] = (grouped[dayKey] ?? 0) + s.durationSeconds;
+    }
+    return grouped;
+  }
+
+  /// 連続学習日数（ストリーク）
+  int getStudyStreak() {
+    final now = DateTime.now();
+    var currentDay = DateTime(now.year, now.month, now.day);
+    int streak = 0;
+
+    // 今日学習したかチェック
+    final todayHasSessions = _box.values.any((s) {
+      final d = DateTime(s.createdAt.year, s.createdAt.month, s.createdAt.day);
+      return d == currentDay;
+    });
+
+    if (!todayHasSessions) {
+      // まだ今日学習していない場合、昨日から起算
+      currentDay = currentDay.subtract(const Duration(days: 1));
+    }
+
+    while (true) {
+      final dayHasSessions = _box.values.any((s) {
+        final d = DateTime(s.createdAt.year, s.createdAt.month, s.createdAt.day);
+        return d == currentDay;
+      });
+      if (!dayHasSessions) break;
+      streak++;
+      currentDay = currentDay.subtract(const Duration(days: 1));
+    }
+
+    return streak;
   }
 }
 

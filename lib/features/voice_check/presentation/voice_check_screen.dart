@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -8,6 +9,7 @@ import '../../../core/utils/text_normalizer.dart';
 import '../../scripts/data/scripts_repository.dart';
 import '../../progress/data/progress_repository.dart';
 import '../data/speech_recognition_service.dart';
+import '../domain/realtime_matcher.dart';
 import '../domain/recognition_mode.dart';
 import '../domain/text_matcher.dart';
 import 'diff_result_widget.dart';
@@ -37,6 +39,8 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
   bool _initialized = false;
   double? _previousScore;
   final Set<String> _allowedKeys = {}; // "original→recognized" 追跡用
+  RealtimeMatcher? _realtimeMatcher;
+  RealtimeMatchState? _realtimeState;
 
   int get _maxSeconds =>
       _mode == RecognitionMode.fullRecitation ? 300 : 60;
@@ -158,18 +162,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        _partialText.isEmpty && !_isRecording
-                            ? '録音ボタンを押して暗唱してください'
-                            : _partialText,
-                        style: TextStyle(
-                          fontSize: 16,
-                          height: 1.8,
-                          color: _partialText.isEmpty
-                              ? Colors.grey[400]
-                              : AppTheme.textDark,
-                        ),
-                      ),
+                      _buildRecognitionText(),
                       if (_isRecording)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
@@ -307,6 +300,14 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
       return;
     }
 
+    final parentheses =
+        TextNormalizer.parseParenthesesMode(_script.parenthesesMode);
+    _realtimeMatcher = RealtimeMatcher(
+      _script.content,
+      parentheses: parentheses,
+    );
+    _realtimeState = null;
+
     setState(() {
       _isRecording = true;
       _partialText = '';
@@ -336,7 +337,14 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
         }
       },
       onPartialResult: (text) {
-        setState(() => _partialText = text);
+        final state = _realtimeMatcher?.processPartial(text);
+        if (state != null && state.newMismatchDetected) {
+          HapticFeedback.heavyImpact();
+        }
+        setState(() {
+          _partialText = text;
+          _realtimeState = state;
+        });
       },
       onError: (error) {
         if (mounted) {
@@ -350,7 +358,11 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
 
   Future<void> _stopRecording() async {
     _timer?.cancel();
-    setState(() => _isRecording = false);
+    _realtimeMatcher?.reset();
+    setState(() {
+      _isRecording = false;
+      _realtimeState = null;
+    });
 
     // 最後の認識結果が確定するまで少し待つ
     await Future.delayed(const Duration(milliseconds: 1200));
@@ -468,6 +480,49 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
     });
   }
 
+  Widget _buildRecognitionText() {
+    if (_partialText.isEmpty && !_isRecording) {
+      return Text(
+        '録音ボタンを押して暗唱してください',
+        style: TextStyle(fontSize: 16, height: 1.8, color: Colors.grey[400]),
+      );
+    }
+
+    final state = _realtimeState;
+    if (state == null || _partialText.isEmpty) {
+      return Text(
+        _partialText,
+        style: const TextStyle(
+          fontSize: 16,
+          height: 1.8,
+          color: AppTheme.textDark,
+        ),
+      );
+    }
+
+    final cutoff = state.rawMatchedUpTo.clamp(0, _partialText.length);
+    final matchedPart = _partialText.substring(0, cutoff);
+    final mismatchPart = _partialText.substring(cutoff);
+
+    return RichText(
+      text: TextSpan(
+        style: const TextStyle(fontSize: 16, height: 1.8),
+        children: [
+          if (matchedPart.isNotEmpty)
+            TextSpan(
+              text: matchedPart,
+              style: const TextStyle(color: AppTheme.secondary),
+            ),
+          if (mismatchPart.isNotEmpty)
+            TextSpan(
+              text: mismatchPart,
+              style: const TextStyle(color: AppTheme.diffMissing),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildResultScreen() {
     final result = _matchResult!;
     final scoreDiff = _previousScore != null
@@ -545,11 +600,13 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
+                      _realtimeMatcher?.reset();
                       setState(() {
                         _showResult = false;
                         _matchResult = null;
                         _partialText = '';
                         _recognizedText = '';
+                        _realtimeState = null;
                       });
                     },
                     child: const Text('もう一度挑戦'),

@@ -10,6 +10,7 @@ import '../features/voice_check/presentation/voice_check_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/settings/presentation/tts_dictionary_screen.dart';
 import '../features/voice_check/presentation/model_download_screen.dart';
+import '../features/progress/presentation/statistics_screen.dart';
 
 final _router = GoRouter(
   initialLocation: '/',
@@ -75,6 +76,10 @@ final _router = GoRouter(
     GoRoute(
       path: '/model-download',
       builder: (context, state) => const ModelDownloadScreen(),
+    ),
+    GoRoute(
+      path: '/statistics',
+      builder: (context, state) => const StatisticsScreen(),
     ),
   ],
 );
