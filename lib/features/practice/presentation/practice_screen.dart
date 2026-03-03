@@ -93,54 +93,65 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
             backgroundColor: Colors.grey[200],
             valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary),
           ),
+          // テキスト表示（穴あき）— スクロール可能
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // テキスト表示（穴あき）
-                  _buildClozeText(currentWord),
-                  const SizedBox(height: 24),
-                  // 回答結果表示
-                  if (_showingResult) _buildResultDisplay(),
-                  // 回答入力
-                  if (!_showingResult)
-                    widget.level == 1
-                        ? _buildChoices(currentWord)
-                        : _buildInputField(currentWord),
-                ],
-              ),
+              child: _buildClozeText(currentWord),
             ),
           ),
-          // ヒント・次へボタン
-          if (!_showingResult)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  if (widget.level > 1 && _hintUsed < 3)
-                    OutlinedButton.icon(
-                      onPressed: () => _showHint(currentWord),
-                      icon: const Icon(Icons.lightbulb_outline, size: 18),
-                      label: Text('ヒント (${3 - _hintUsed})'),
-                    ),
-                ],
-              ),
+          // 回答エリア（画面下部に固定）
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
+                ),
+              ],
             ),
-          if (_showingResult)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _next,
-                  child: Text(
-                    _currentIndex < _clozeWords.length - 1 ? '次へ' : '結果を見る',
-                  ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_showingResult) ...[
+                      _buildResultDisplay(),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _next,
+                          child: Text(
+                            _currentIndex < _clozeWords.length - 1 ? '次へ' : '結果を見る',
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (!_showingResult) ...[
+                      widget.level == 1
+                          ? _buildChoices(currentWord)
+                          : _buildInputField(currentWord),
+                      if (widget.level > 1 && _hintUsed < 3)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: OutlinedButton.icon(
+                            onPressed: () => _showHint(currentWord),
+                            icon: const Icon(Icons.lightbulb_outline, size: 18),
+                            label: Text('ヒント (${3 - _hintUsed})'),
+                          ),
+                        ),
+                    ],
+                  ],
                 ),
               ),
             ),
+          ),
         ],
       ),
     );
@@ -203,7 +214,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey[200]!),
       ),
-      child: RichText(text: TextSpan(children: spans)),
+      child: Text.rich(TextSpan(children: spans)),
     );
   }
 

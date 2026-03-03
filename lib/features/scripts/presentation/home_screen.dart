@@ -211,43 +211,7 @@ class _ScriptCard extends ConsumerWidget {
     final lastPracticed = _timeAgo(script.lastPracticedAt);
     final progress = script.progressPercent;
 
-    return Dismissible(
-      key: Key(script.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        decoration: BoxDecoration(
-          color: AppTheme.error,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Icon(Icons.delete, color: Colors.white),
-      ),
-      confirmDismiss: (direction) async {
-        return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('削除確認'),
-            content: Text('「${script.title}」を削除しますか？'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('キャンセル'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: TextButton.styleFrom(foregroundColor: AppTheme.error),
-                child: const Text('削除'),
-              ),
-            ],
-          ),
-        );
-      },
-      onDismissed: (_) {
-        ref.read(scriptsListProvider.notifier).deleteScript(script);
-      },
-      child: Card(
+    return Card(
         margin: const EdgeInsets.symmetric(vertical: 6),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
@@ -352,7 +316,6 @@ class _ScriptCard extends ConsumerWidget {
             ),
           ),
         ),
-      ),
     );
   }
 

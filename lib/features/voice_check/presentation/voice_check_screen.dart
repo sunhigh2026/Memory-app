@@ -348,21 +348,26 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
 
   Future<void> _stopRecording() async {
     _timer?.cancel();
+    setState(() => _isRecording = false);
+
+    // 最後の認識結果が確定するまで少し待つ
+    await Future.delayed(const Duration(milliseconds: 1200));
+
     final speechService = ref.read(speechRecognitionServiceProvider);
     await speechService.stopListening();
 
-    // 全文暗唱モード: 蓄積テキストを使用
+    // 全文暗唱モード: _partialText は accumulated + 現在の部分結果を含む
     if (_mode == RecognitionMode.fullRecitation) {
       final accumulated = speechService.accumulatedText;
-      if (accumulated.isNotEmpty) {
+      if (_partialText.length > accumulated.length) {
+        _recognizedText = _partialText;
+      } else if (accumulated.isNotEmpty) {
         _recognizedText = accumulated;
         _partialText = accumulated;
       }
     } else if (_partialText.isNotEmpty) {
       _recognizedText = _partialText;
     }
-
-    setState(() => _isRecording = false);
 
     if (_recognizedText.isEmpty) {
       if (mounted) {

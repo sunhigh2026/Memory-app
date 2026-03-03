@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  static const Color primary = Color(0xFF3B82F6);
-  static const Color secondary = Color(0xFF10B981);
+  // 落ち着いたトーンのインディゴブルー
+  static const Color primary = Color(0xFF3949AB); // Indigo 600
+  static const Color secondary = Color(0xFF00897B); // Teal 600
   static const Color accent = Color(0xFFF59E0B);
-  static const Color error = Color(0xFFEF4444);
-  static const Color background = Color(0xFFF9FAFB);
-  static const Color textDark = Color(0xFF111827);
-  static const Color textLight = Color(0xFF6B7280);
+  static const Color error = Color(0xFFE53935);
+  static const Color background = Color(0xFFF4F6F8);
+  static const Color textDark = Color(0xFF263238); // Blue Grey 900
+  static const Color textLight = Color(0xFF78909C); // Blue Grey 400
   static const Color cardBackground = Colors.white;
 
   // スコア判定色
@@ -50,22 +51,10 @@ class AppTheme {
           fontWeight: FontWeight.bold,
           color: textDark,
         ),
-        bodyLarge: GoogleFonts.notoSansJp(
-          fontSize: 18,
-          color: textDark,
-        ),
-        bodyMedium: GoogleFonts.notoSansJp(
-          fontSize: 16,
-          color: textDark,
-        ),
-        bodySmall: GoogleFonts.notoSansJp(
-          fontSize: 14,
-          color: textLight,
-        ),
-        labelSmall: GoogleFonts.notoSansJp(
-          fontSize: 12,
-          color: textLight,
-        ),
+        bodyLarge: GoogleFonts.notoSansJp(fontSize: 18, color: textDark),
+        bodyMedium: GoogleFonts.notoSansJp(fontSize: 16, color: textDark),
+        bodySmall: GoogleFonts.notoSansJp(fontSize: 14, color: textLight),
+        labelSmall: GoogleFonts.notoSansJp(fontSize: 12, color: textLight),
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.white,
@@ -81,9 +70,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: cardBackground,
         elevation: 1,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -125,8 +112,10 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: primary, width: 2),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: primary,
