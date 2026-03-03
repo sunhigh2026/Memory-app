@@ -1,3 +1,5 @@
+import 'package:jp_transliterate/jp_transliterate.dart';
+
 /// 括弧の扱い
 enum ParenthesesMode { keep, stripContent, stripSymbols }
 
@@ -17,6 +19,33 @@ class TextNormalizer {
     // 全角英数字を半角に変換
     result = _fullWidthToHalfWidth(result);
     // カタカナをひらがなに変換
+    result = katakanaToHiragana(result);
+    return result;
+  }
+
+  /// 漢字混じりテキスト → ひらがな変換
+  /// jp_transliterate を使用。失敗時はカタカナ→ひらがなフォールバック。
+  static Future<String> toHiragana(String text) async {
+    try {
+      final data = await JpTransliterate.transliterate(kanji: text);
+      return data.hiragana;
+    } catch (_) {
+      // オフライン時やAPI失敗時のフォールバック
+      return katakanaToHiragana(text);
+    }
+  }
+
+  /// フル正規化: ひらがな化 → 記号除去
+  static Future<String> fullNormalize(
+    String text, {
+    ParenthesesMode parentheses = ParenthesesMode.keep,
+  }) async {
+    var result = text;
+    result = handleParentheses(result, parentheses);
+    result = result.replaceAll(RegExp(r'[。、！？!?,.\s\n\r　]'), '');
+    result = _fullWidthToHalfWidth(result);
+    result = await toHiragana(result);
+    // toHiragana後にカタカナが残る場合もあるので二重変換
     result = katakanaToHiragana(result);
     return result;
   }

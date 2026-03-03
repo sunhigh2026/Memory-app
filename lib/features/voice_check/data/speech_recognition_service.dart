@@ -105,6 +105,7 @@ class NativeSpeechRecognition implements SpeechRecognitionService {
         }
       },
       listenFor: _listenFor,
+      pauseFor: const Duration(seconds: 3),
       localeId: 'ja-JP',
       listenOptions: SpeechListenOptions(
         partialResults: true,

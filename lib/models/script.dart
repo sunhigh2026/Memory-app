@@ -44,6 +44,9 @@ class Script extends HiveObject {
   @HiveField(12)
   late String parenthesesMode; // 'keep' / 'stripContent' / 'stripSymbols'
 
+  @HiveField(13)
+  late String fullTextHiragana; // ひらがな化済みテキスト（キャッシュ）
+
   Script({
     required this.id,
     required this.title,
@@ -58,6 +61,7 @@ class Script extends HiveObject {
     List<ClozeWord>? clozeWords,
     List<String>? tags,
     this.parenthesesMode = 'stripContent',
+    this.fullTextHiragana = '',
   })  : createdAt = createdAt ?? DateTime.now(),
         lastPracticedAt = lastPracticedAt ?? DateTime.now(),
         clozeWords = clozeWords ?? [],

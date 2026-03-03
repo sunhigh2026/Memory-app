@@ -12,6 +12,7 @@ import '../domain/recognition_mode.dart';
 import '../domain/text_matcher.dart';
 import 'diff_result_widget.dart';
 import '../../../models/script.dart';
+import '../data/allowed_pairs_repository.dart';
 
 class VoiceCheckScreen extends ConsumerStatefulWidget {
   final String scriptId;
@@ -35,6 +36,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
   bool _showResult = false;
   bool _initialized = false;
   double? _previousScore;
+  final Set<String> _allowedKeys = {}; // "original→recognized" 追跡用
 
   int get _maxSeconds =>
       _mode == RecognitionMode.fullRecitation ? 300 : 60;
@@ -378,14 +380,18 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
       return;
     }
 
-    // マッチング（括弧設定を適用）
+    // マッチング（ひらがな正規化＋許容ペア適用）
     final matcher = TextMatcher();
     final parentheses =
         TextNormalizer.parseParenthesesMode(_script.parenthesesMode);
-    final result = matcher.match(
+    final allowedPairsRepo = ref.read(allowedPairsRepositoryProvider);
+    final allowedPairs = allowedPairsRepo.getByScriptId(widget.scriptId);
+    final result = await matcher.matchAsync(
       _script.content,
       _recognizedText,
       parentheses: parentheses,
+      cachedOriginalHiragana: _script.fullTextHiragana,
+      allowedPairs: allowedPairs,
     );
 
     // 進捗保存
@@ -405,6 +411,60 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
     setState(() {
       _matchResult = result;
       _showResult = true;
+    });
+  }
+
+  Future<void> _markAsCorrect(String originalWord, String recognizedWord) async {
+    final repo = ref.read(allowedPairsRepositoryProvider);
+    if (repo.exists(widget.scriptId, originalWord, recognizedWord)) return;
+
+    await repo.add(
+      scriptId: widget.scriptId,
+      originalWord: originalWord,
+      recognizedWord: recognizedWord,
+    );
+
+    setState(() {
+      _allowedKeys.add('$originalWord→$recognizedWord');
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('「$recognizedWord」→「$originalWord」を許容語として登録しました'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+
+    // スコアを再計算
+    await _recalculateScore();
+  }
+
+  Future<void> _recalculateScore() async {
+    if (_recognizedText.isEmpty) return;
+
+    final matcher = TextMatcher();
+    final parentheses =
+        TextNormalizer.parseParenthesesMode(_script.parenthesesMode);
+    final allowedPairsRepo = ref.read(allowedPairsRepositoryProvider);
+    final allowedPairs = allowedPairsRepo.getByScriptId(widget.scriptId);
+    final result = await matcher.matchAsync(
+      _script.content,
+      _recognizedText,
+      parentheses: parentheses,
+      cachedOriginalHiragana: _script.fullTextHiragana,
+      allowedPairs: allowedPairs,
+    );
+
+    // 進捗を更新
+    final progressRepo = ref.read(progressRepositoryProvider);
+    await progressRepo.updateScriptProgress(
+        _script, result.similarityScore, 'voice', 4);
+    ref.read(scriptsListProvider.notifier).refresh();
+
+    setState(() {
+      _matchResult = result;
     });
   }
 
@@ -443,20 +503,10 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
             ),
             const SizedBox(height: 24),
             // Diff 表示
-            DiffResultWidget(segments: result.diffSegments),
-            const SizedBox(height: 16),
-            // 注記
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '音声認識の特性上、正しく発音しても異なる漢字で表示される場合があります',
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              ),
+            DiffResultWidget(
+              segments: result.diffSegments,
+              onMarkCorrect: _markAsCorrect,
+              alreadyAllowed: _allowedKeys,
             ),
             const SizedBox(height: 16),
             // 前回比較

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 import '../../../models/script.dart';
+import '../../../core/utils/text_normalizer.dart';
 
 class ScriptsRepository {
   static const String _boxName = 'scripts';
@@ -29,6 +30,11 @@ class ScriptsRepository {
     required List<String> tags,
     String parenthesesMode = 'stripContent',
   }) async {
+    final parentheses = TextNormalizer.parseParenthesesMode(parenthesesMode);
+    final hiragana = await TextNormalizer.fullNormalize(
+      content,
+      parentheses: parentheses,
+    );
     final script = Script(
       id: _uuid.v4(),
       title: title,
@@ -36,12 +42,19 @@ class ScriptsRepository {
       category: tags.isNotEmpty ? tags.first : '',
       tags: tags,
       parenthesesMode: parenthesesMode,
+      fullTextHiragana: hiragana,
     );
     await _box.add(script);
     return script;
   }
 
   Future<void> update(Script script) async {
+    // content 変更時にひらがなキャッシュを再生成
+    final parentheses = TextNormalizer.parseParenthesesMode(script.parenthesesMode);
+    script.fullTextHiragana = await TextNormalizer.fullNormalize(
+      script.content,
+      parentheses: parentheses,
+    );
     await script.save();
   }
 

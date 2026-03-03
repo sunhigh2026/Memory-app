@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../data/scripts_repository.dart';
 import '../../tts/presentation/tts_player_widget.dart';
+import '../../voice_check/data/allowed_pairs_repository.dart';
 import '../../../models/script.dart';
 
 class ScriptDetailScreen extends ConsumerWidget {
@@ -147,9 +148,113 @@ class ScriptDetailScreen extends ConsumerWidget {
                   ],
                 ),
               ),
+            // 許容語リスト
+            const SizedBox(height: 24),
+            _AllowedPairsSection(scriptId: scriptId),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AllowedPairsSection extends ConsumerWidget {
+  final String scriptId;
+
+  const _AllowedPairsSection({required this.scriptId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final repo = ref.watch(allowedPairsRepositoryProvider);
+    final pairs = repo.getByScriptId(scriptId);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '許容語リスト',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[600],
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (pairs.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[200]!),
+            ),
+            child: Text(
+              '音声チェック結果画面から登録できます',
+              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+              textAlign: TextAlign.center,
+            ),
+          )
+        else
+          ...pairs.map((pair) => Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: pair.recognizedWord,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppTheme.diffExtra,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const TextSpan(
+                              text: ' → ',
+                              style: TextStyle(
+                                  fontSize: 14, color: AppTheme.textLight),
+                            ),
+                            TextSpan(
+                              text: pair.originalWord,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppTheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const TextSpan(
+                              text: ' として許容',
+                              style: TextStyle(
+                                  fontSize: 12, color: AppTheme.textLight),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      color: Colors.grey[400],
+                      onPressed: () async {
+                        await repo.delete(pair);
+                        ref.read(scriptsListProvider.notifier).refresh();
+                      },
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+              )),
+      ],
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:math';
 import '../../../core/utils/text_normalizer.dart';
+import '../../../models/allowed_pair.dart';
 
 /// テキストマッチング結果
 class MatchResult {
@@ -24,40 +25,117 @@ class MatchResult {
 }
 
 /// Diff の各セグメント
-enum DiffType { match, missing, extra, replace }
+enum DiffType { match, missing, extra, replace, allowed }
 
 class DiffSegment {
   final DiffType type;
   final String text;
   final String? replacement; // replace 時の置換テキスト
+  final String? hiraganaReading; // allowed 時のひらがな読み
 
   DiffSegment({
     required this.type,
     required this.text,
     this.replacement,
+    this.hiraganaReading,
   });
 }
 
 /// テキストマッチングアルゴリズム
 class TextMatcher {
-  /// 原文と認識テキストを比較
+  /// ひらがな正規化＋許容ペア適用による比較（スコアはひらがなベース）
+  Future<MatchResult> matchAsync(
+    String original,
+    String recognized, {
+    ParenthesesMode parentheses = ParenthesesMode.keep,
+    String cachedOriginalHiragana = '',
+    List<AllowedPair> allowedPairs = const [],
+  }) async {
+    // Step 1: ひらがな正規化（スコア計算用）
+    String hiraOriginal = cachedOriginalHiragana;
+    if (hiraOriginal.isEmpty) {
+      hiraOriginal = await TextNormalizer.fullNormalize(
+        original,
+        parentheses: parentheses,
+      );
+    }
+    String hiraRecognized = await TextNormalizer.fullNormalize(
+      recognized,
+      parentheses: parentheses,
+    );
+
+    // Step 2: 許容ペアを適用（認識テキスト内の許容語を原文側の語に置換）
+    for (final pair in allowedPairs) {
+      if (pair.recognizedHira.isNotEmpty) {
+        hiraRecognized = hiraRecognized.replaceAll(
+          pair.recognizedHira,
+          pair.originalHira,
+        );
+      }
+    }
+
+    // Step 3: ひらがなベースのスコア計算
+    final distance = _levenshteinDistance(hiraOriginal, hiraRecognized);
+    final maxLen = max(hiraOriginal.length, hiraRecognized.length);
+    final similarity = maxLen == 0 ? 100.0 : (1 - distance / maxLen) * 100;
+
+    // Step 4: 漢字ベースの差分（表示用）
+    final normOriginal =
+        TextNormalizer.normalize(original, parentheses: parentheses);
+    final normRecognized =
+        TextNormalizer.normalize(recognized, parentheses: parentheses);
+    final diffSegments = _computeDiff(normOriginal, normRecognized);
+
+    // Step 5: replace セグメントのうち許容ペアに該当するものを allowed に変換
+    final processedSegments = <DiffSegment>[];
+    for (final seg in diffSegments) {
+      if (seg.type == DiffType.replace &&
+          seg.replacement != null &&
+          allowedPairs.isNotEmpty) {
+        final matchingPair = allowedPairs.cast<AllowedPair?>().firstWhere(
+              (p) =>
+                  p!.originalWord == seg.text &&
+                  p.recognizedWord == seg.replacement,
+              orElse: () => null,
+            );
+        if (matchingPair != null) {
+          processedSegments.add(DiffSegment(
+            type: DiffType.allowed,
+            text: seg.text,
+            replacement: seg.replacement,
+            hiraganaReading: matchingPair.originalHira.isNotEmpty
+                ? matchingPair.originalHira
+                : null,
+          ));
+          continue;
+        }
+      }
+      processedSegments.add(seg);
+    }
+
+    return MatchResult(
+      similarityScore: similarity.clamp(0, 100),
+      diffSegments: processedSegments,
+      normalizedOriginal: normOriginal,
+      normalizedRecognized: normRecognized,
+    );
+  }
+
+  /// 原文と認識テキストを比較（同期版、後方互換）
   MatchResult match(
     String original,
     String recognized, {
     ParenthesesMode parentheses = ParenthesesMode.keep,
   }) {
-    // Step 1: 正規化
     final normOriginal =
         TextNormalizer.normalize(original, parentheses: parentheses);
     final normRecognized =
         TextNormalizer.normalize(recognized, parentheses: parentheses);
 
-    // Step 2: 類似度スコア計算（レーベンシュタイン距離）
     final distance = _levenshteinDistance(normOriginal, normRecognized);
     final maxLen = max(normOriginal.length, normRecognized.length);
     final similarity = maxLen == 0 ? 100.0 : (1 - distance / maxLen) * 100;
 
-    // Step 3: 差分検出（LCS ベース）
     final diffSegments = _computeDiff(normOriginal, normRecognized);
 
     return MatchResult(
@@ -106,7 +184,6 @@ class TextMatcher {
 
     while (oi < original.length || ri < recognized.length) {
       if (li < lcs.length && oi < original.length && ri < recognized.length && original[oi] == lcs[li] && recognized[ri] == lcs[li]) {
-        // 一致
         final matchStart = oi;
         while (li < lcs.length && oi < original.length && ri < recognized.length && original[oi] == lcs[li] && recognized[ri] == lcs[li]) {
           oi++;
@@ -118,7 +195,6 @@ class TextMatcher {
           text: original.substring(matchStart, oi),
         ));
       } else {
-        // 不一致部分を収集
         final origStart = oi;
         final recStart = ri;
 
@@ -133,20 +209,17 @@ class TextMatcher {
         final recPart = recognized.substring(recStart, ri);
 
         if (origPart.isNotEmpty && recPart.isNotEmpty) {
-          // 置換
           segments.add(DiffSegment(
             type: DiffType.replace,
             text: origPart,
             replacement: recPart,
           ));
         } else if (origPart.isNotEmpty) {
-          // 欠落
           segments.add(DiffSegment(
             type: DiffType.missing,
             text: origPart,
           ));
         } else if (recPart.isNotEmpty) {
-          // 余分
           segments.add(DiffSegment(
             type: DiffType.extra,
             text: recPart,
@@ -174,7 +247,6 @@ class TextMatcher {
       }
     }
 
-    // LCS を復元
     final buffer = StringBuffer();
     int i = m, j = n;
     while (i > 0 && j > 0) {

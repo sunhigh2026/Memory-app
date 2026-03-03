@@ -35,13 +35,14 @@ class ScriptAdapter extends TypeAdapter<Script> {
               ? [fields[3] as String]
               : []),
       parenthesesMode: fields[12] as String? ?? 'stripContent',
+      fullTextHiragana: fields[13] as String? ?? '',
     );
   }
 
   @override
   void write(BinaryWriter writer, Script obj) {
     writer
-      ..writeByte(13)
+      ..writeByte(14)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -67,7 +68,9 @@ class ScriptAdapter extends TypeAdapter<Script> {
       ..writeByte(11)
       ..write(obj.tags)
       ..writeByte(12)
-      ..write(obj.parenthesesMode);
+      ..write(obj.parenthesesMode)
+      ..writeByte(13)
+      ..write(obj.fullTextHiragana);
   }
 
   @override

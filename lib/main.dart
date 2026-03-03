@@ -5,6 +5,7 @@ import 'models/script.dart';
 import 'models/cloze_word.dart';
 import 'models/practice_session.dart';
 import 'models/tts_dictionary_entry.dart';
+import 'models/allowed_pair.dart';
 import 'app/app.dart';
 
 void main() async {
@@ -18,11 +19,13 @@ void main() async {
   Hive.registerAdapter(ClozeWordAdapter());
   Hive.registerAdapter(PracticeSessionAdapter());
   Hive.registerAdapter(TtsDictionaryEntryAdapter());
+  Hive.registerAdapter(AllowedPairAdapter());
 
   // Box を開く
   await Hive.openBox<Script>('scripts');
   await Hive.openBox<PracticeSession>('practice_sessions');
   await Hive.openBox<TtsDictionaryEntry>('tts_dictionary');
+  await Hive.openBox<AllowedPair>('allowed_pairs');
   await Hive.openBox('app_settings');
 
   runApp(
