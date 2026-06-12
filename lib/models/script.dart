@@ -33,7 +33,7 @@ class Script extends HiveObject {
   late DateTime createdAt;
 
   @HiveField(9)
-  late DateTime lastPracticedAt;
+  DateTime? lastPracticedAt;
 
   @HiveField(10)
   late List<ClozeWord> clozeWords;
@@ -68,17 +68,20 @@ class Script extends HiveObject {
   @HiveField(20)
   late int scheduleIndex; // generatedSchedule 内の現在位置
 
+  @HiveField(21)
+  Map<String, int>? mistakeWords; // よく間違える単語とその回数
+
   Script({
     required this.id,
     required this.title,
     required this.content,
     this.category = '',
-    this.currentLevel = 1,
+    this.currentLevel = 0,
     this.practiceCount = 0,
     this.correctRate = 0.0,
     this.bestVoiceScore = 0.0,
     DateTime? createdAt,
-    DateTime? lastPracticedAt,
+    this.lastPracticedAt,
     List<ClozeWord>? clozeWords,
     List<String>? tags,
     this.parenthesesMode = 'stripContent',
@@ -90,11 +93,12 @@ class Script extends HiveObject {
     this.targetDate,
     List<DateTime>? generatedSchedule,
     this.scheduleIndex = 0,
+    Map<String, int>? mistakeWords,
   })  : createdAt = createdAt ?? DateTime.now(),
-        lastPracticedAt = lastPracticedAt ?? DateTime.now(),
         clozeWords = clozeWords ?? [],
         tags = tags ?? [],
-        generatedSchedule = generatedSchedule ?? [];
+        generatedSchedule = generatedSchedule ?? [],
+        mistakeWords = mistakeWords ?? {};
 
   double get progressPercent {
     switch (currentLevel) {

@@ -66,7 +66,18 @@ class ProgressRepository {
   }
 
   /// Script の進捗を更新
-  Future<void> updateScriptProgress(Script script, double score, String mode, int level) async {
+  Future<void> updateScriptProgress(
+    Script script, 
+    double score, 
+    String mode, 
+    int level, {
+    List<String> mistakes = const [],
+  }) async {
+    // 開発用のデバッグログ出力
+    print('--- [progress_repository] updateScriptProgress START ---');
+    print('scriptId: ${script.id}, key: ${script.key}, isInBox: ${script.isInBox}');
+    print('Before: practiceCount=${script.practiceCount}, correctRate=${script.correctRate}, currentLevel=${script.currentLevel}');
+
     script.practiceCount++;
     script.lastPracticedAt = DateTime.now();
 
@@ -79,8 +90,24 @@ class ProgressRepository {
     }
 
     // レベル昇格判定
+    if (script.currentLevel == 0) {
+      script.currentLevel = 1;
+      print('[progress_repository] Level set to 1 on first practice.');
+    }
+
     if (mode == 'cloze' && score >= 80 && level == script.currentLevel && script.currentLevel < 4) {
       script.currentLevel++;
+      print('[progress_repository] Leveled Up! New level: ${script.currentLevel}');
+    }
+
+    // 間違えた単語のカウントを増やす
+    if (mistakes.isNotEmpty) {
+      final map = Map<String, int>.from(script.mistakeWords ?? {});
+      for (final word in mistakes) {
+        map[word] = (map[word] ?? 0) + 1;
+      }
+      script.mistakeWords = map;
+      print('[progress_repository] Added mistakes: $mistakes. New map: $map');
     }
 
     // スケジュール更新
@@ -118,7 +145,23 @@ class ProgressRepository {
       script.nextReviewAt = srResult.nextReviewAt;
     }
 
-    await script.save();
+    try {
+      if (script.isInBox && script.key != null) {
+        print('[progress_repository] Calling script.save()...');
+        await script.save();
+      } else {
+        print('[progress_repository] Script is not in box or key is null. Calling Box.put()...');
+        final box = Hive.box<Script>('scripts');
+        final key = script.key ?? script.id;
+        await box.put(key, script);
+      }
+      print('--- [progress_repository] updateScriptProgress SUCCESS ---');
+      print('After: practiceCount=${script.practiceCount}, correctRate=${script.correctRate}, currentLevel=${script.currentLevel}');
+    } catch (e, stack) {
+      print('[progress_repository] Error saving script: $e');
+      print(stack);
+      rethrow;
+    }
   }
 
   // --- 統計集計メソッド ---

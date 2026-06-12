@@ -13,9 +13,19 @@ class PdfTextExtractor {
 
   PdfTextExtractor(this._ocrService);
 
+  /// PDFファイルのページ数を取得
+  Future<int> getPageCount(String filePath) async {
+    final document = await PdfDocument.openFile(filePath);
+    final count = document.pagesCount;
+    await document.close();
+    return count;
+  }
+
   /// PDFファイルからテキストを抽出
   Future<String> extractText(
     String filePath, {
+    int? startPage,
+    int? endPage,
     void Function(int current, int total)? onProgress,
   }) async {
     final document = await PdfDocument.openFile(filePath);
@@ -23,8 +33,14 @@ class PdfTextExtractor {
     final tempDir = await getTemporaryDirectory();
 
     try {
-      for (int i = 1; i <= document.pagesCount; i++) {
-        onProgress?.call(i, document.pagesCount);
+      final start = startPage ?? 1;
+      final end = endPage ?? document.pagesCount;
+      final totalToProcess = end - start + 1;
+      int processedCount = 0;
+
+      for (int i = start; i <= end; i++) {
+        processedCount++;
+        onProgress?.call(processedCount, totalToProcess);
 
         final page = await document.getPage(i);
         // ページを画像としてレンダリング（2倍解像度でOCR精度向上）

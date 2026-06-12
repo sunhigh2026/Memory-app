@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -115,6 +116,13 @@ class _OcrImportSheetState extends ConsumerState<OcrImportSheet> {
           lockAspectRatio: false,
           hideBottomControls: false,
         ),
+        IOSUiSettings(
+          title: 'OCR範囲を選択',
+          doneButtonTitle: '確定',
+          cancelButtonTitle: 'キャンセル',
+          aspectRatioLockEnabled: false,
+          resetAspectRatioEnabled: true,
+        ),
       ],
     );
     if (croppedFile == null) return; // キャンセル
@@ -156,15 +164,46 @@ class _OcrImportSheetState extends ConsumerState<OcrImportSheet> {
     final path = await imageService.pickPdf();
     if (path == null) return;
 
+    if (!mounted) return;
+
+    final extractor = ref.read(pdfTextExtractorProvider);
+    int pagesCount = 1;
+    try {
+      pagesCount = await extractor.getPageCount(path);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('PDFの読み込みに失敗しました: $e')),
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
+
+    int? startPage = 1;
+    int? endPage = pagesCount;
+
+    if (pagesCount > 1) {
+      final result = await showDialog<Map<String, int>>(
+        context: context,
+        builder: (context) => _PdfPageSelectionDialog(pagesCount: pagesCount),
+      );
+      if (result == null) return; // キャンセル
+      startPage = result['start'];
+      endPage = result['end'];
+    }
+
     setState(() {
       _processing = true;
       _statusText = 'PDFを処理中...';
     });
 
     try {
-      final extractor = ref.read(pdfTextExtractorProvider);
       final text = await extractor.extractText(
         path,
+        startPage: startPage,
+        endPage: endPage,
         onProgress: (current, total) {
           if (mounted) {
             setState(() {
@@ -194,6 +233,120 @@ class _OcrImportSheetState extends ConsumerState<OcrImportSheet> {
         );
       }
     }
+  }
+}
+
+class _PdfPageSelectionDialog extends StatefulWidget {
+  final int pagesCount;
+  const _PdfPageSelectionDialog({required this.pagesCount});
+
+  @override
+  State<_PdfPageSelectionDialog> createState() => _PdfPageSelectionDialogState();
+}
+
+class _PdfPageSelectionDialogState extends State<_PdfPageSelectionDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _startController;
+  late final TextEditingController _endController;
+
+  @override
+  void initState() {
+    super.initState();
+    _startController = TextEditingController(text: '1');
+    _endController = TextEditingController(text: widget.pagesCount.toString());
+  }
+
+  @override
+  void dispose() {
+    _startController.dispose();
+    _endController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('ページ範囲の指定'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('PDFの全ページ数: ${widget.pagesCount}ページ'),
+            const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _startController,
+                    decoration: const InputDecoration(
+                      labelText: '開始ページ',
+                      hintText: '1',
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return '入力してください';
+                      final val = int.tryParse(value);
+                      if (val == null || val < 1 || val > widget.pagesCount) {
+                        return '1〜${widget.pagesCount}の範囲';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                  child: Text('〜'),
+                ),
+                Expanded(
+                  child: TextFormField(
+                    controller: _endController,
+                    decoration: const InputDecoration(
+                      labelText: '終了ページ',
+                      hintText: '1',
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return '入力してください';
+                      final val = int.tryParse(value);
+                      if (val == null || val < 1 || val > widget.pagesCount) {
+                        return '1〜${widget.pagesCount}の範囲';
+                      }
+                      final startVal = int.tryParse(_startController.text);
+                      if (startVal != null && val < startVal) {
+                        return '開始ページ以降';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(null),
+          child: const Text('キャンセル'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (_formKey.currentState?.validate() ?? false) {
+              final start = int.parse(_startController.text);
+              final end = int.parse(_endController.text);
+              Navigator.of(context).pop({'start': start, 'end': end});
+            }
+          },
+          child: const Text('確定'),
+        ),
+      ],
+    );
   }
 }
 

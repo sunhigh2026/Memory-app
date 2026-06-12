@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   cupertino_icons: ^1.0.8
 
@@ -44,6 +46,9 @@ dependencies:
   file_picker: ^8.0.0
   google_mlkit_text_recognition: ^0.14.0
   pdfx: ^2.6.0
+  # CSV Import
+  csv: ^6.0.0
+  flutter_markdown: ^0.7.1
 
   # Phase 2: オフライン音声認識（sherpa-onnx + SenseVoice）
   sherpa_onnx: ^1.10.0
@@ -67,3 +72,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/

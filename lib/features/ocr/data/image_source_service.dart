@@ -27,7 +27,13 @@ class ImageSourceService {
       type: FileType.custom,
       allowedExtensions: ['pdf'],
     );
-    return result?.files.single.path;
+    if (result == null) return null;
+    
+    final path = result.files.single.path;
+    if (path != null && !path.toLowerCase().endsWith('.pdf')) {
+      return null;
+    }
+    return path;
   }
 }
 

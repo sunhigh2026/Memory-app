@@ -124,6 +124,65 @@ class AppTheme {
     );
   }
 
+  // グレースケール（Colors.grey[xxx] の置き換え用）
+  static const Color grey200 = Color(0xFFEEEEEE);
+  static const Color grey300 = Color(0xFFE0E0E0);
+  static const Color grey400 = Color(0xFFBDBDBD);
+  static const Color grey500 = Color(0xFF9E9E9E);
+  static const Color grey600 = Color(0xFF757575);
+  static const Color levelGold = Color(0xFFD4AF37); // scorePerfect と同値、level4 用
+
+  // Radius トークン
+  static const double radiusSm = 8.0;
+  static const double radiusMd = 12.0;
+  static const double radiusLg = 16.0;
+
+  // 共通カードデコレーション
+  static BoxDecoration get cardDecoration => const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.all(Radius.circular(radiusMd)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      );
+
+  // ボーダーのみのコンテナ用
+  static BoxDecoration get outlineDecoration => const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.all(Radius.circular(radiusMd)),
+        border: Border.fromBorderSide(BorderSide(color: grey300)),
+      );
+
+  // TextStyle 定数
+  static const TextStyle sectionHeader = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    color: grey600,
+  );
+  static const TextStyle statNumber = TextStyle(
+    fontSize: 28,
+    fontWeight: FontWeight.w700,
+  );
+
+  // タグカラーパレット（8-A）
+  static const tagColorPairs = [
+    (background: Color(0xFFEDE9FE), text: Color(0xFF5B21B6)), // Violet
+    (background: Color(0xFFDCFCE7), text: Color(0xFF14532D)), // Green
+    (background: Color(0xFFFEF3C7), text: Color(0xFF78350F)), // Amber
+    (background: Color(0xFFFFEDD5), text: Color(0xFF7C2D12)), // Orange
+    (background: Color(0xFFE0F2FE), text: Color(0xFF0C4A6E)), // Sky
+    (background: Color(0xFFFCE7F3), text: Color(0xFF831843)), // Pink
+    (background: Color(0xFFF1F5F9), text: Color(0xFF334155)), // Slate
+  ];
+
+  /// タグ名から色ペアをハッシュで自動割り当て。同じ名前は常に同じ色。
+  static ({Color background, Color text}) tagColor(String tagName) =>
+      tagColorPairs[tagName.hashCode.abs() % tagColorPairs.length];
+
   static Color scoreColor(double score) {
     if (score >= 95) return scorePerfect;
     if (score >= 85) return scoreGreat;

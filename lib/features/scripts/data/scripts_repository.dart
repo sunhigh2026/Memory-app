@@ -3,6 +3,7 @@ import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 import '../../../models/script.dart';
 import '../../../core/utils/text_normalizer.dart';
+import '../../progress/domain/schedule_generator.dart';
 
 class ScriptsRepository {
   static const String _boxName = 'scripts';
@@ -12,7 +13,23 @@ class ScriptsRepository {
 
   List<Script> getAll() {
     final scripts = _box.values.toList();
-    scripts.sort((a, b) => b.lastPracticedAt.compareTo(a.lastPracticedAt));
+    
+    // 自動マイグレーション: 未学習なのにレベルが1以上になっているものは0に補正
+    for (final s in scripts) {
+      if (s.practiceCount == 0 && s.currentLevel > 0) {
+        s.currentLevel = 0;
+        s.save();
+      }
+    }
+
+    scripts.sort((a, b) {
+      final aTime = a.lastPracticedAt;
+      final bTime = b.lastPracticedAt;
+      if (aTime == null && bTime == null) return 0;
+      if (aTime == null) return 1;
+      if (bTime == null) return -1;
+      return bTime.compareTo(aTime);
+    });
     return scripts;
   }
 
@@ -29,12 +46,26 @@ class ScriptsRepository {
     required String content,
     required List<String> tags,
     String parenthesesMode = 'stripContent',
+    DateTime? targetDate,
   }) async {
     final parentheses = TextNormalizer.parseParenthesesMode(parenthesesMode);
     final hiragana = await TextNormalizer.fullNormalize(
       content,
       parentheses: parentheses,
     );
+
+    List<DateTime> generatedSchedule = [];
+    DateTime? nextReviewAt;
+    if (targetDate != null) {
+      generatedSchedule = ScheduleGenerator.generate(
+        startDate: DateTime.now(),
+        targetDate: targetDate,
+      );
+      if (generatedSchedule.isNotEmpty) {
+        nextReviewAt = generatedSchedule[0];
+      }
+    }
+
     final script = Script(
       id: _uuid.v4(),
       title: title,
@@ -43,6 +74,9 @@ class ScriptsRepository {
       tags: tags,
       parenthesesMode: parenthesesMode,
       fullTextHiragana: hiragana,
+      targetDate: targetDate,
+      generatedSchedule: generatedSchedule,
+      nextReviewAt: nextReviewAt,
     );
     await _box.add(script);
     return script;
@@ -105,12 +139,14 @@ class ScriptsListNotifier extends StateNotifier<List<Script>> {
     required String content,
     required List<String> tags,
     String parenthesesMode = 'stripContent',
+    DateTime? targetDate,
   }) async {
     final script = await _repository.add(
       title: title,
       content: content,
       tags: tags,
       parenthesesMode: parenthesesMode,
+      targetDate: targetDate,
     );
     refresh();
     return script;

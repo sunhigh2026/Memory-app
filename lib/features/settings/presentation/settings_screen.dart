@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/section_header.dart';
 import '../../../core/data/app_settings_repository.dart';
 import '../../scripts/data/scripts_repository.dart';
 import '../../tts/data/tts_dictionary_repository.dart';
@@ -56,11 +57,7 @@ class SettingsScreen extends ConsumerWidget {
         downloadInfo.status == ModelDownloadStatus.downloaded;
 
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
+      decoration: AppTheme.outlineDecoration,
       child: ListTile(
         leading: Icon(
           isDownloaded ? Icons.check_circle : Icons.cloud_download,
@@ -69,7 +66,7 @@ class SettingsScreen extends ConsumerWidget {
         title: const Text('モデル管理', style: TextStyle(fontSize: 16)),
         subtitle: Text(
           isDownloaded ? 'ダウンロード済み' : '未ダウンロード',
-          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+          style: TextStyle(fontSize: 12, color: AppTheme.grey500),
         ),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => context.push('/model-download'),
@@ -91,14 +88,10 @@ class SettingsScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           // 穴埋め設定
-          _SectionHeader(title: '穴埋め練習'),
+          const SectionHeader(title: '穴埋め練習'),
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[200]!),
-            ),
+            decoration: AppTheme.outlineDecoration,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -129,21 +122,17 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 Text(
                   '穴埋めにする単語の割合を設定します',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                  style: TextStyle(fontSize: 12, color: AppTheme.grey500),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
           // 読み上げ設定
-          _SectionHeader(title: '音声読み上げ'),
+          const SectionHeader(title: '音声読み上げ'),
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[200]!),
-            ),
+            decoration: AppTheme.outlineDecoration,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -183,32 +172,24 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           // 読み上げ辞書
           Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[200]!),
-            ),
+            decoration: AppTheme.outlineDecoration,
             child: ListTile(
               leading: const Icon(Icons.menu_book, color: AppTheme.primary),
               title: const Text('読み上げ辞書', style: TextStyle(fontSize: 16)),
               subtitle: Text(
                 '${dictionaryEntries.length}件の登録',
-                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                style: TextStyle(fontSize: 12, color: AppTheme.grey500),
               ),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push('/tts-dictionary'),
+              onTap: () => context.push('/settings/tts-dictionary'),
             ),
           ),
           const SizedBox(height: 16),
           // 音声認識設定
-          _SectionHeader(title: '音声認識'),
+          const SectionHeader(title: '音声認識'),
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[200]!),
-            ),
+            decoration: AppTheme.outlineDecoration,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -219,7 +200,7 @@ class SettingsScreen extends ConsumerWidget {
                 Text(
                   '音声認識の特性上、正しく発音しても異なる漢字で表示される場合があります。'
                   'ひらがなに変換して比較することで、同音異義語の影響を軽減しています。',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                  style: TextStyle(fontSize: 12, color: AppTheme.grey500),
                 ),
               ],
             ),
@@ -232,14 +213,10 @@ class SettingsScreen extends ConsumerWidget {
           ],
           const SizedBox(height: 16),
           // 復習ペース
-          _SectionHeader(title: '復習'),
+          const SectionHeader(title: '復習'),
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[200]!),
-            ),
+            decoration: AppTheme.outlineDecoration,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -250,32 +227,37 @@ class SettingsScreen extends ConsumerWidget {
                 Text(
                   '新規テキストに適用されます。各テキストの詳細画面で個別に変更できます。\n'
                   '本番日が設定されているテキストは本番日スケジュールが優先されます。',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                  style: TextStyle(fontSize: 12, color: AppTheme.grey500),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
           // アプリ情報
-          _SectionHeader(title: 'アプリ情報'),
+          const SectionHeader(title: 'アプリ情報'),
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[200]!),
-            ),
+            decoration: AppTheme.outlineDecoration,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('暗記サポート', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                const Text('暗リピ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
-                Text('バージョン 1.0.0', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                Text('バージョン 1.0.0', style: TextStyle(fontSize: 12, color: AppTheme.grey500)),
                 const SizedBox(height: 8),
                 Text(
                   '文章暗記をサポートするアプリです。テキストを登録し、音声読み上げで耳から覚え、'
                   '穴埋め練習と音声認識による暗記確認で完全暗記を目指せます。',
-                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 13, color: AppTheme.grey600),
+                ),
+                const SizedBox(height: 16),
+                const Divider(height: 1),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.help_outline, color: AppTheme.primary),
+                  title: const Text('使い方と仕組み', style: TextStyle(fontSize: 15)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/settings/how-to-use'),
                 ),
               ],
             ),
@@ -325,22 +307,3 @@ class _ReviewPaceSelector extends StatelessWidget {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  const _SectionHeader({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: AppTheme.textLight,
-        ),
-      ),
-    );
-  }
-}

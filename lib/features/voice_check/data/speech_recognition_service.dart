@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import '../../../core/data/app_settings_repository.dart';
 import '../domain/recognition_mode.dart';
 import 'speech_engine_type.dart';
-import 'sherpa_speech_recognition.dart';
+// Web環境ではsherpa_onnx（FFI）が使えないため条件付きインポート
+import 'sherpa_speech_recognition.dart'
+    if (dart.library.js_interop) 'sherpa_speech_recognition_stub.dart';
 import 'model_download_service.dart';
 
 /// 音声認識エンジンの抽象インターフェース
@@ -160,7 +163,8 @@ final speechRecognitionServiceProvider =
     Provider<SpeechRecognitionService>((ref) {
   final engineType = ref.watch(speechEngineTypeProvider);
 
-  if (engineType == SpeechEngineType.sherpaOnnx) {
+  // Web環境ではsherpa-onnxは使用不可（FFI非対応）
+  if (!kIsWeb && engineType == SpeechEngineType.sherpaOnnx) {
     final downloadService = ref.watch(modelDownloadServiceProvider);
     final service = SherpaSpeechRecognition(downloadService);
     ref.onDispose(() => service.dispose());
@@ -171,3 +175,4 @@ final speechRecognitionServiceProvider =
     return service;
   }
 });
+

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/section_header.dart';
 import '../data/scripts_repository.dart';
 import '../../tts/presentation/tts_player_widget.dart';
 import '../../voice_check/data/allowed_pairs_repository.dart';
@@ -31,6 +32,16 @@ class ScriptDetailScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(script.title),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
@@ -63,15 +74,11 @@ class ScriptDetailScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 16),
-            // 原文表示
+            // 原文表示 — Section 1-E: outlineDecoration
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[200]!),
-              ),
+              decoration: AppTheme.outlineDecoration,
               child: SelectableText(
                 script.content,
                 style: const TextStyle(
@@ -90,10 +97,7 @@ class ScriptDetailScreen extends ConsumerWidget {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      final level = script.currentLevel.clamp(1, 3);
-                      context.push('/practice/${script.id}/$level');
-                    },
+                    onPressed: () => _showLevelSelectionBottomSheet(context, script),
                     icon: const Icon(Icons.edit_note),
                     label: const Text('穴埋め練習'),
                     style: ElevatedButton.styleFrom(
@@ -124,7 +128,7 @@ class ScriptDetailScreen extends ConsumerWidget {
                 decoration: BoxDecoration(
                   color: AppTheme.scoreColor(script.bestVoiceScore)
                       .withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                   border: Border.all(
                     color: AppTheme.scoreColor(script.bestVoiceScore)
                         .withValues(alpha: 0.3),
@@ -160,6 +164,116 @@ class ScriptDetailScreen extends ConsumerWidget {
       ),
     );
   }
+
+  void _showLevelSelectionBottomSheet(BuildContext context, Script script) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              '練習レベルを選択',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textDark),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            _buildLevelTile(
+              context: context,
+              level: 1,
+              title: 'Level 1: 4択練習',
+              description: '穴あき部分（約20%）に当てはまる語を4択から選んで回答します。初心者向け。',
+              recommended: script.currentLevel == 1 || script.currentLevel == 0,
+              scriptId: script.id,
+            ),
+            const SizedBox(height: 12),
+            _buildLevelTile(
+              context: context,
+              level: 2,
+              title: 'Level 2: キーボード入力',
+              description: '穴あき部分（約40%）に当てはまる語をキーボードで直接入力します。中級者向け。',
+              recommended: script.currentLevel == 2,
+              scriptId: script.id,
+            ),
+            const SizedBox(height: 12),
+            _buildLevelTile(
+              context: context,
+              level: 3,
+              title: 'Level 3: 高難度入力',
+              description: '穴あき部分（約60%）に当てはまる語を入力します。ほぼ全体の暗唱が必要です。上級者向け。',
+              recommended: script.currentLevel >= 3,
+              scriptId: script.id,
+            ),
+            const SizedBox(height: 20),
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('キャンセル'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLevelTile({
+    required BuildContext context,
+    required int level,
+    required String title,
+    required String description,
+    required bool recommended,
+    required String scriptId,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: recommended ? AppTheme.primary.withValues(alpha: 0.04) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: recommended ? AppTheme.primary : AppTheme.grey200,
+          width: recommended ? 2 : 1,
+        ),
+      ),
+      child: ListTile(
+        onTap: () {
+          Navigator.of(context).pop(); // ボトムシートを閉じる
+          context.push('/practice/$scriptId/$level');
+        },
+        title: Row(
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            if (recommended) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'おすすめ',
+                  style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(description, style: TextStyle(fontSize: 12, color: AppTheme.grey500)),
+        ),
+        trailing: const Icon(Icons.chevron_right, size: 20),
+      ),
+    );
+  }
 }
 
 class _TargetDateSection extends ConsumerStatefulWidget {
@@ -182,24 +296,15 @@ class _TargetDateSectionState extends ConsumerState<_TargetDateSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '復習スケジュール',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey[600],
-          ),
-        ),
-        const SizedBox(height: 8),
+        // Section 3-A: SectionHeader widget を使用
+        const SectionHeader(title: '復習スケジュール'),
         // 復習ペース（本番日未設定時のみ有効）
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey[200]!),
-          ),
+          // Section 2: padding 14 → 16
+          padding: const EdgeInsets.all(16),
+          // Section 1-E: outlineDecoration
+          decoration: AppTheme.outlineDecoration,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -239,21 +344,23 @@ class _TargetDateSectionState extends ConsumerState<_TargetDateSection> {
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
                     '本番日スケジュールが優先されます',
-                    style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                    style: TextStyle(fontSize: 11, color: AppTheme.grey500),
                   ),
                 ),
             ],
           ),
         ),
-        const SizedBox(height: 10),
+        // Section 2: height 10 → 8
+        const SizedBox(height: 8),
         // 本番日設定
         if (script.hasTargetDate) ...[
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(14),
+            // Section 2: padding 14 → 16
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
               border: Border.all(
                 color: script.daysUntilTarget <= 3
                     ? AppTheme.error.withValues(alpha: 0.4)
@@ -301,110 +408,132 @@ class _TargetDateSectionState extends ConsumerState<_TargetDateSection> {
                   const SizedBox(height: 6),
                   Text(
                     '復習予定: 全${script.generatedSchedule.length}回のうち${script.scheduleIndex}回目',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                    style: TextStyle(fontSize: 12, color: AppTheme.grey500),
                   ),
                   const SizedBox(height: 8),
-                  // スケジュール展開
-                  GestureDetector(
+                  // Section 4-C: GestureDetector → InkWell (48dp タップ面積)
+                  InkWell(
                     onTap: () =>
                         setState(() => _scheduleExpanded = !_scheduleExpanded),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _scheduleExpanded
-                              ? Icons.expand_less
-                              : Icons.expand_more,
-                          size: 18,
-                          color: AppTheme.primary,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _scheduleExpanded ? 'スケジュールを閉じる' : 'スケジュールを表示',
-                          style: const TextStyle(
-                            fontSize: 12,
+                    borderRadius:
+                        BorderRadius.circular(AppTheme.radiusSm),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 12, horizontal: 4),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _scheduleExpanded
+                                ? Icons.expand_less
+                                : Icons.expand_more,
+                            size: 18,
                             color: AppTheme.primary,
-                            fontWeight: FontWeight.w500,
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_scheduleExpanded)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Column(
-                        children: List.generate(
-                          script.generatedSchedule.length,
-                          (i) {
-                            final date = script.generatedSchedule[i];
-                            final isCompleted = i < script.scheduleIndex;
-                            final isToday = _isSameDay(date, DateTime.now());
-                            return Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 2),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    isCompleted
-                                        ? Icons.check_circle
-                                        : isToday
-                                            ? Icons.radio_button_checked
-                                            : Icons.radio_button_unchecked,
-                                    size: 16,
-                                    color: isCompleted
-                                        ? AppTheme.secondary
-                                        : isToday
-                                            ? AppTheme.primary
-                                            : Colors.grey[400],
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    _formatDate(date),
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: isToday
-                                          ? AppTheme.primary
-                                          : Colors.grey[600],
-                                      fontWeight: isToday
-                                          ? FontWeight.w600
-                                          : FontWeight.normal,
-                                      decoration: isCompleted
-                                          ? TextDecoration.lineThrough
-                                          : null,
-                                    ),
-                                  ),
-                                  if (isToday)
-                                    Padding(
-                                      padding:
-                                          const EdgeInsets.only(left: 6),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 6, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.primary
-                                              .withValues(alpha: 0.1),
-                                          borderRadius:
-                                              BorderRadius.circular(4),
-                                        ),
-                                        child: const Text(
-                                          '今日',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: AppTheme.primary,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _scheduleExpanded ? 'スケジュールを閉じる' : 'スケジュールを表示',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                  ),
+                  // Section 5-D: AnimatedSize でスケジュール展開
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOutCubic,
+                    child: _scheduleExpanded
+                        ? Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Column(
+                              children: List.generate(
+                                script.generatedSchedule.length,
+                                (i) {
+                                  final date = script.generatedSchedule[i];
+                                  final isCompleted =
+                                      i < script.scheduleIndex;
+                                  final isToday =
+                                      _isSameDay(date, DateTime.now());
+                                  return Padding(
+                                    // Section 2: vertical 2 → 4
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 4),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          isCompleted
+                                              ? Icons.check_circle
+                                              : isToday
+                                                  ? Icons
+                                                      .radio_button_checked
+                                                  : Icons
+                                                      .radio_button_unchecked,
+                                          size: 16,
+                                          color: isCompleted
+                                              ? AppTheme.secondary
+                                              : isToday
+                                                  ? AppTheme.primary
+                                                  : AppTheme.grey400,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          _formatDate(date),
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: isToday
+                                                ? AppTheme.primary
+                                                : AppTheme.grey600,
+                                            fontWeight: isToday
+                                                ? FontWeight.w600
+                                                : FontWeight.normal,
+                                            decoration: isCompleted
+                                                ? TextDecoration.lineThrough
+                                                : null,
+                                          ),
+                                        ),
+                                        if (isToday)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                                left: 6),
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 1),
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.primary
+                                                    .withValues(alpha: 0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                        AppTheme.radiusSm /
+                                                            2),
+                                              ),
+                                              child: const Text(
+                                                '今日',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: AppTheme.primary,
+                                                  fontWeight:
+                                                      FontWeight.w600,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
                 ],
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
@@ -458,7 +587,6 @@ class _TargetDateSectionState extends ConsumerState<_TargetDateSection> {
     script.targetDate = picked;
     script.generatedSchedule = schedule;
     script.scheduleIndex = 0;
-    // 最初のスケジュール日を nextReviewAt に設定
     if (schedule.isNotEmpty) {
       script.nextReviewAt = schedule[0];
     }
@@ -488,39 +616,34 @@ class _AllowedPairsSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '許容語リスト',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey[600],
-          ),
-        ),
-        const SizedBox(height: 8),
+        // Section 3-A: SectionHeader widget を使用
+        const SectionHeader(title: '許容語リスト'),
         if (pairs.isEmpty)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[200]!),
+              // Section 1-C: Colors.grey[50] → AppTheme.background
+              color: AppTheme.background,
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              border: Border.all(color: AppTheme.grey200),
             ),
             child: Text(
               '音声チェック結果画面から登録できます',
-              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+              style: TextStyle(fontSize: 13, color: AppTheme.grey500),
               textAlign: TextAlign.center,
             ),
           )
         else
           ...pairs.map((pair) => Container(
-                margin: const EdgeInsets.only(bottom: 6),
+                // Section 2: margin bottom 6 → 8
+                margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.symmetric(
                     horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[200]!),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                  border: Border.all(color: AppTheme.grey200),
                 ),
                 child: Row(
                   children: [
@@ -558,15 +681,17 @@ class _AllowedPairsSection extends ConsumerWidget {
                         ),
                       ),
                     ),
+                    // Section 4-A: タッチターゲット 48dp 確保
                     IconButton(
                       icon: const Icon(Icons.close, size: 18),
-                      color: Colors.grey[400],
+                      color: AppTheme.grey400,
                       onPressed: () async {
                         await repo.delete(pair);
                         ref.read(scriptsListProvider.notifier).refresh();
                       },
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
+                      splashRadius: 24,
+                      constraints: const BoxConstraints(
+                          minWidth: 48, minHeight: 48),
                     ),
                   ],
                 ),
@@ -576,6 +701,7 @@ class _AllowedPairsSection extends ConsumerWidget {
   }
 }
 
+// Section 3-C: Semantics でラップ
 class _InfoChip extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -584,26 +710,30 @@ class _InfoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppTheme.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: AppTheme.primary),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppTheme.primary,
-              fontWeight: FontWeight.w500,
+    return Semantics(
+      label: label,
+      child: Container(
+        // Section 2: horizontal:10,vertical:6 → horizontal:8,vertical:6
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppTheme.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: AppTheme.primary),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppTheme.primary,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

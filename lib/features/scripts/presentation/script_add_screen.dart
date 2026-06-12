@@ -24,6 +24,7 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
   final _tagController = TextEditingController();
   final _contentFocusNode = FocusNode();
   List<String> _tags = [];
+  List<String> _tagSuggestions = [];
   String _parenthesesMode = 'stripContent';
   bool _isEditing = false;
 
@@ -38,12 +39,23 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
   @override
   void initState() {
     super.initState();
+    _tagController.addListener(_updateSuggestions);
     if (widget.scriptId != null) {
       _isEditing = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadScript();
       });
     }
+  }
+
+  void _updateSuggestions() {
+    final input = _tagController.text.trim();
+    final allTags = ref.read(scriptsRepositoryProvider).getAllTags();
+    final suggestions = allTags
+        .where((t) =>
+            (input.isEmpty || t.startsWith(input)) && !_tags.contains(t))
+        .toList();
+    setState(() => _tagSuggestions = suggestions);
   }
 
   void _loadScript() {
@@ -115,19 +127,23 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
             ),
             const SizedBox(height: 16),
             // タグ
-            Text('タグ', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+            Text('タグ', style: const TextStyle(fontSize: 14, color: AppTheme.grey600)),
             const SizedBox(height: 8),
             Wrap(
               spacing: 6,
               runSpacing: 6,
               children: _tags.map((tag) {
+                final colors = AppTheme.tagColor(tag);
                 return Chip(
-                  label: Text(tag, style: const TextStyle(fontSize: 13)),
-                  deleteIcon: const Icon(Icons.close, size: 16),
+                  label: Text(
+                    tag,
+                    style: TextStyle(fontSize: 13, color: colors.text),
+                  ),
+                  deleteIcon: Icon(Icons.close, size: 16, color: colors.text),
                   onDeleted: () {
                     setState(() => _tags.remove(tag));
                   },
-                  backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
+                  backgroundColor: colors.background,
                   side: BorderSide.none,
                 );
               }).toList(),
@@ -157,11 +173,36 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
                 ),
               ],
             ),
+            if (_tagSuggestions.isNotEmpty)
+              Container(
+                constraints: const BoxConstraints(maxHeight: 120),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: AppTheme.grey300),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                ),
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: EdgeInsets.zero,
+                  children: _tagSuggestions.map((t) {
+                    final colors = AppTheme.tagColor(t);
+                    return ListTile(
+                      dense: true,
+                      title: Text(t, style: TextStyle(color: colors.text)),
+                      tileColor: colors.background.withValues(alpha: 0.5),
+                      onTap: () {
+                        _tagController.text = t;
+                        _addTag();
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
             const SizedBox(height: 16),
             // 括弧の扱い
             Text(
               '括弧の扱い（音声確認時）',
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              style: const TextStyle(fontSize: 14, color: AppTheme.grey600),
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
@@ -186,7 +227,7 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
             // 本文インポート方法
             Text(
               '本文の入力方法',
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              style: const TextStyle(fontSize: 14, color: AppTheme.grey600),
             ),
             const SizedBox(height: 8),
             Row(
@@ -199,7 +240,7 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
                 const SizedBox(width: 8),
                 _ImportButton(
                   icon: Icons.content_paste,
-                  label: 'クリップボード',
+                  label: '貼り付け',
                   onTap: _pasteFromClipboard,
                 ),
                 const SizedBox(width: 8),
@@ -305,6 +346,7 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
     setState(() {
       _tags.add(tag);
       _tagController.clear();
+      _tagSuggestions = [];
     });
   }
 
@@ -394,8 +436,11 @@ class _ImportButton extends StatelessWidget {
             children: [
               Icon(icon, color: AppTheme.primary, size: 24),
               const SizedBox(height: 4),
+              // Section 7: FittedBox を除去し ellipsis で高さを統一
               Text(
                 label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: AppTheme.primary,
                   fontSize: 11,

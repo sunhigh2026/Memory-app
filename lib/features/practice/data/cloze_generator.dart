@@ -2,9 +2,45 @@ import 'dart:math';
 import '../../../core/utils/japanese_utils.dart';
 import '../../../models/cloze_word.dart';
 
-/// ルールベースの自動穴埋め生成
+/// 高度なルールベースによる自動穴埋め生成
 class ClozeGenerator {
   final Random _random = Random();
+
+  // 穴埋め問題として暗記する価値の低い漢字2文字語（ブラックリスト）
+  static const Set<String> _blacklistedWords = {
+    // 指示詞・形式名詞・代名詞
+    'これ', 'それ', 'あれ', 'どれ', 'この', 'その', 'あの', 'どの',
+    'ここ', 'そこ', 'あそこ', 'どこ', 'こちら', 'そちら', 'あちら', 'どちら',
+    'こと', 'もの', 'とき', 'ため', 'よう', 'そう', 'わけ', 'うち', 'なか',
+    '自分', '自身', '自ら', '彼ら', '彼女', '相手', 'これら', 'それら',
+    // 汎用名詞（時間・場所・数量）
+    '今回', '前回', '次回', '今度', '最初', '最後', '最終', '途中', '前後',
+    '左右', '上下', '内外', '内側', '外側', '内部', '外部', '中心', '周辺',
+    '一部', '全部', '全体', '個別', '共通', '一般', '特殊', '基本', '詳細',
+    '日付', '日時', '年度', '期間', '時間', '日数', '月数', '年数', '回数',
+    '件数', '人数', '数量', '金額', '割合', '程度', '範囲', '限度', '基準',
+    // 汎用名詞（ドキュメント・システム動作・処理）
+    '記述', '記載', '記入', '説明', '表示', '画面', '動作', '実行', '処理',
+    '設定', '変更', '追加', '削除', '登録', '選択', '指定', '確認', '終了',
+    '開始', '完了', '経過', '結果', '影響', '理由', '原因', '対策', '状況',
+    '状態', '項目', '内容', '対象', '規定', '条件', '目的', '方法',
+    '手続', '場合', '監査', '検査', '調査', '分析', '把握', '検討', '決定',
+    '合意', '承認', '許可', '認可', '届出', '申請', '報告', '提出', '期限',
+    '定義', '意義', '意味', '分類', '区分', '関係', '関連', '効果',
+    '役割', '機能', '特徴', '性質', '構造', '組織', '体制', '制度', '法律',
+    '規則', '規程', '細則', '方針', '手順', '計画', '実施', '評価', '管理',
+    '運用', '活用', '導入', '構築', '整備', '向上', '改善', '解決', '支援',
+    // 会計・実務などで除外したい汎用2文字語
+    '企業', '活動', '取引', '発生', '認識', '測定', '開示', '提供',
+    '有用', '意思', '判断', '算定', '計算', '作成', 'その他',
+    '公表', '閲覧', '縦覧', '送信', '受信', '入力', '出力', '部分',
+    'データ', 'ソフト', 'ハード', 'ネット', 'ウェブ', 'サイト', 'ページ',
+  };
+
+  /// ダミーの初期化メソッド（practice_screen.dart 側との互換性維持のため）
+  static Future<void> initialize() async {
+    // 形態素解析ライブラリの廃止に伴い、処理は行いません
+  }
 
   /// テキストから穴埋め対象語を自動生成
   /// [densityPercent]: 穴埋め密度 (5-30, デフォルト15)
@@ -18,12 +54,26 @@ class ClozeGenerator {
     allCandidates.addAll(kanjiWords);
     allCandidates.addAll(katakanaWords);
 
-    // 助詞・助動詞・接続詞を除外
+    // 1. 助詞・助動詞・接続詞を除外
     allCandidates.removeWhere((wp) =>
         JapaneseUtils.isParticle(wp.word) ||
         JapaneseUtils.isAuxiliaryOrConjunction(wp.word));
 
-    // 出現頻度を計算し、1〜3回の語を優先
+    // 2. ブラックリスト（暗記対象として不適格な不要語）の除外
+    allCandidates.removeWhere((wp) => _blacklistedWords.contains(wp.word));
+
+    // 3. 2文字の漢字語で接尾辞的な特徴を持つ語の簡易除外
+    allCandidates.removeWhere((wp) {
+      final w = wp.word;
+      if (w.length == 2) {
+        if (w.endsWith('的') || w.endsWith('化') || w.endsWith('性')) {
+          return true;
+        }
+      }
+      return false;
+    });
+
+    // 出現頻度を計算
     final frequencyMap = <String, int>{};
     for (final wp in allCandidates) {
       frequencyMap[wp.word] = (frequencyMap[wp.word] ?? 0) + 1;
@@ -39,13 +89,26 @@ class ClozeGenerator {
       }
     }
 
-    // 出現頻度でソート（1〜3回の語を優先）
+    // 優先度ソート：
+    // - 漢字3文字以上、またはカタカナ4文字以上の語を最優先（重要な専門用語である確率が極めて高いため）
+    // - 次に出現頻度が少ない語（1〜3回）を優先
+    // - 最後に残りの漢字2文字語を配置
     uniqueCandidates.sort((a, b) {
+      final aIsLong = (JapaneseUtils.extractKanjiWords(a.word).isNotEmpty && a.word.length >= 3) ||
+                      (JapaneseUtils.extractKatakanaWords(a.word).isNotEmpty && a.word.length >= 4);
+      final bIsLong = (JapaneseUtils.extractKanjiWords(b.word).isNotEmpty && b.word.length >= 3) ||
+                      (JapaneseUtils.extractKatakanaWords(b.word).isNotEmpty && b.word.length >= 4);
+
+      if (aIsLong != bIsLong) {
+        return aIsLong ? -1 : 1;
+      }
+
       final freqA = frequencyMap[a.word] ?? 0;
       final freqB = frequencyMap[b.word] ?? 0;
       final priorityA = (freqA >= 1 && freqA <= 3) ? 0 : 1;
       final priorityB = (freqB >= 1 && freqB <= 3) ? 0 : 1;
       if (priorityA != priorityB) return priorityA.compareTo(priorityB);
+
       return a.startIndex.compareTo(b.startIndex);
     });
 
@@ -54,11 +117,8 @@ class ClozeGenerator {
     final targetClozeChars = (totalChars * densityPercent / 100).round();
     int currentClozeChars = 0;
 
-    // シャッフルしてランダムに選出
-    final shuffled = List<WordPosition>.from(uniqueCandidates)..shuffle(_random);
-
     final selected = <ClozeWord>[];
-    for (final wp in shuffled) {
+    for (final wp in uniqueCandidates) {
       if (currentClozeChars >= targetClozeChars) break;
       // 重複チェック（既存の穴埋めと重ならないか）
       final overlaps = selected.any((cw) =>

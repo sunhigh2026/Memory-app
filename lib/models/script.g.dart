@@ -26,7 +26,7 @@ class ScriptAdapter extends TypeAdapter<Script> {
       correctRate: fields[6] as double,
       bestVoiceScore: fields[7] as double,
       createdAt: fields[8] as DateTime,
-      lastPracticedAt: fields[9] as DateTime,
+      lastPracticedAt: fields[9] as DateTime?,
       clozeWords: (fields[10] as List).cast<ClozeWord>(),
       // 自動マイグレーション: tags がなければ category からフォールバック
       tags: fields[11] != null
@@ -45,13 +45,16 @@ class ScriptAdapter extends TypeAdapter<Script> {
           ? (fields[19] as List).cast<DateTime>()
           : [],
       scheduleIndex: (fields[20] as int?) ?? 0,
+      mistakeWords: fields[21] != null
+          ? (fields[21] as Map).cast<String, int>()
+          : {},
     );
   }
 
   @override
   void write(BinaryWriter writer, Script obj) {
     writer
-      ..writeByte(21)
+      ..writeByte(22)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -93,7 +96,9 @@ class ScriptAdapter extends TypeAdapter<Script> {
       ..writeByte(19)
       ..write(obj.generatedSchedule)
       ..writeByte(20)
-      ..write(obj.scheduleIndex);
+      ..write(obj.scheduleIndex)
+      ..writeByte(21)
+      ..write(obj.mistakeWords);
   }
 
   @override

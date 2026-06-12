@@ -11,6 +11,8 @@ class PracticeResultScreen extends ConsumerStatefulWidget {
   final int level;
   final int totalQuestions;
   final int correctAnswers;
+  final int durationSeconds;
+  final List<String> mistakes;
 
   const PracticeResultScreen({
     super.key,
@@ -19,6 +21,8 @@ class PracticeResultScreen extends ConsumerStatefulWidget {
     required this.level,
     required this.totalQuestions,
     required this.correctAnswers,
+    this.durationSeconds = 0,
+    this.mistakes = const [],
   });
 
   @override
@@ -43,27 +47,87 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
       CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
     );
     _animController.forward();
-    _saveProgress();
+    
+    // 最初のフレーム描画完了後に安全に保存処理を実行
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _saveProgress();
+    });
   }
 
+  // Section 6: 保存中/成功/失敗 SnackBar フィードバック
   Future<void> _saveProgress() async {
     if (_saved) return;
+    if (!mounted) return;
     _saved = true;
 
-    final progressRepo = ref.read(progressRepositoryProvider);
-    await progressRepo.addSession(
-      scriptId: widget.scriptId,
-      mode: 'cloze',
-      level: widget.level,
-      score: widget.score,
-    );
+    final messenger = ScaffoldMessenger.of(context);
+    ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? controller;
 
-    // Script の進捗を更新
-    final scripts = ref.read(scriptsListProvider);
-    final script = scripts.firstWhere((s) => s.id == widget.scriptId);
-    await progressRepo.updateScriptProgress(
-        script, widget.score, 'cloze', widget.level);
-    ref.read(scriptsListProvider.notifier).refresh();
+    try {
+      controller = messenger.showSnackBar(
+        SnackBar(
+          content: Row(
+            children: const [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('保存中...'),
+            ],
+          ),
+          duration: const Duration(seconds: 30),
+        ),
+      );
+
+      final progressRepo = ref.read(progressRepositoryProvider);
+      print('[PracticeResult] Calling progressRepo.addSession...');
+      await progressRepo.addSession(
+        scriptId: widget.scriptId,
+        mode: 'cloze',
+        level: widget.level,
+        score: widget.score,
+        durationSeconds: widget.durationSeconds,
+      );
+      print('[PracticeResult] Session saved successfully.');
+
+      final scripts = ref.read(scriptsListProvider);
+      final script = scripts.firstWhere((s) => s.id == widget.scriptId);
+      print('[PracticeResult] Found script: ${script.title}, before level: ${script.currentLevel}');
+      
+      print('[PracticeResult] Calling progressRepo.updateScriptProgress...');
+      await progressRepo.updateScriptProgress(
+          script, widget.score, 'cloze', widget.level, mistakes: widget.mistakes);
+      print('[PracticeResult] Script progress updated successfully.');
+      
+      print('[PracticeResult] Refreshing scripts list provider...');
+      ref.read(scriptsListProvider.notifier).refresh();
+      print('[PracticeResult] Provider refreshed.');
+
+      controller.close();
+      if (mounted) {
+        messenger.showSnackBar(const SnackBar(
+          content: Text('保存しました ✓'),
+          duration: Duration(seconds: 2),
+        ));
+      }
+    } catch (e, stackTrace) {
+      _saved = false; // 再試行可能に
+      print('[PracticeResult] 保存エラー: $e');
+      print('[PracticeResult] スタックトレース: $stackTrace');
+      controller?.close();
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
+          content: Text('保存に失敗しました: $e'),
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(label: '再試行', onPressed: _saveProgress),
+        ));
+      }
+    }
   }
 
   @override
@@ -83,11 +147,21 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
     final leveledUp =
         passed && script != null && script.currentLevel > widget.level;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('練習結果'),
-        automaticallyImplyLeading: false,
-      ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        context.go('/detail/${widget.scriptId}');
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.go('/detail/${widget.scriptId}'),
+          ),
+          title: const Text('練習結果'),
+          automaticallyImplyLeading: false,
+        ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -126,7 +200,8 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  // Section 1-D: circular(16) → radiusLg
+                  borderRadius: BorderRadius.circular(AppTheme.radiusLg),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.05),
@@ -163,7 +238,8 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
                             horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
                           color: AppTheme.secondary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius:
+                              BorderRadius.circular(AppTheme.radiusSm),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -189,7 +265,7 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
                         '80%以上で次のレベルに昇格できます',
                         style: TextStyle(
                           fontSize: 13,
-                          color: Colors.grey[500],
+                          color: AppTheme.grey500,
                         ),
                       ),
                     ],
@@ -202,7 +278,8 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => context.go('/detail/${widget.scriptId}'),
+                      onPressed: () =>
+                          context.go('/detail/${widget.scriptId}'),
                       child: const Text('詳細に戻る'),
                     ),
                   ),
@@ -216,7 +293,7 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
                         context.pushReplacement(
                             '/practice/${widget.scriptId}/$level');
                       },
-                      child: const Text('もう一度'),
+                      child: Text(passed && widget.level < 3 ? '次のレベルへ' : 'もう一度'),
                     ),
                   ),
                 ],
@@ -225,8 +302,9 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class _ResultStat extends StatelessWidget {
@@ -246,16 +324,13 @@ class _ResultStat extends StatelessWidget {
       children: [
         Text(
           value,
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
+          // Section 3-B: AppTheme.statNumber を使用
+          style: AppTheme.statNumber.copyWith(color: color),
         ),
         const SizedBox(height: 4),
         Text(
           label,
-          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+          style: TextStyle(fontSize: 12, color: AppTheme.grey500),
         ),
       ],
     );

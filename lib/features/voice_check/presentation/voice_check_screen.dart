@@ -25,7 +25,9 @@ class VoiceCheckScreen extends ConsumerStatefulWidget {
   ConsumerState<VoiceCheckScreen> createState() => _VoiceCheckScreenState();
 }
 
-class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
+// Section 5-F: スコアアニメーション用に TickerProviderStateMixin を追加
+class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
+    with TickerProviderStateMixin {
   late Script _script;
   RecognitionMode _mode = RecognitionMode.immediate;
   bool _isRecording = false;
@@ -38,10 +40,14 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
   bool _showResult = false;
   bool _initialized = false;
   double? _previousScore;
-  final Set<String> _allowedKeys = {}; // "original→recognized" 追跡用
+  final Set<String> _allowedKeys = {};
   RealtimeMatcher? _realtimeMatcher;
   RealtimeMatchState? _realtimeState;
-  bool _isProcessing = false; // 停止処理中のガード
+  bool _isProcessing = false;
+
+  // Section 5-F: スコアカウントアップアニメーション
+  late final AnimationController _scoreAnimCtrl;
+  late Animation<double> _scoreAnim;
 
   int get _maxSeconds =>
       _mode == RecognitionMode.fullRecitation ? 300 : 60;
@@ -50,13 +56,18 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
   void initState() {
     super.initState();
     _loadData();
+    // Section 5-F: AnimationController 初期化
+    _scoreAnimCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _scoreAnim = const AlwaysStoppedAnimation(0.0);
   }
 
   void _loadData() {
     final scripts = ref.read(scriptsListProvider);
     _script = scripts.firstWhere((s) => s.id == widget.scriptId);
 
-    // 前回スコア取得
     final progressRepo = ref.read(progressRepositoryProvider);
     _previousScore = progressRepo.getPreviousScore(widget.scriptId, 'voice');
 
@@ -66,7 +77,33 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _scoreAnimCtrl.dispose();
     super.dispose();
+  }
+
+  Future<bool> _showExitConfirmationDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('確認の中止'),
+        content: const Text('音声暗記確認を中止して詳細画面に戻りますか？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.error,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('中止する'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   @override
@@ -76,11 +113,38 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
     }
 
     if (_showResult && _matchResult != null) {
-      return _buildResultScreen();
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          context.go('/detail/${widget.scriptId}');
+        },
+        child: _buildResultScreen(),
+      );
     }
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('音声暗記確認')),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldPop = await _showExitConfirmationDialog();
+        if (shouldPop && mounted) {
+          context.pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () async {
+              final shouldPop = await _showExitConfirmationDialog();
+              if (shouldPop && mounted) {
+                context.pop();
+              }
+            },
+          ),
+          title: const Text('音声暗記確認'),
+        ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -94,48 +158,53 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            // 原文表示エリア
+            // 原文表示エリア — Section 1-E: outlineDecoration
             GestureDetector(
               onTap: () => setState(() => _showOriginal = !_showOriginal),
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[200]!),
-                ),
+                decoration: AppTheme.outlineDecoration,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
                         Icon(
-                          _showOriginal ? Icons.visibility : Icons.visibility_off,
+                          _showOriginal
+                              ? Icons.visibility
+                              : Icons.visibility_off,
                           size: 16,
-                          color: Colors.grey[500],
+                          color: AppTheme.grey500,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           '原文（タップで表示/非表示）',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[500],
+                            color: AppTheme.grey500,
                           ),
                         ),
                       ],
                     ),
-                    if (_showOriginal) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        _script.content,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          height: 1.8,
-                          color: AppTheme.textDark,
-                        ),
-                      ),
-                    ],
+                    // Section 5-C: AnimatedSize で原文の展開/折りたたみ
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeInOut,
+                      child: _showOriginal
+                          ? Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                _script.content,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  height: 1.8,
+                                  color: AppTheme.textDark,
+                                ),
+                              ),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
                   ],
                 ),
               ),
@@ -153,9 +222,10 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                   border: Border.all(
-                    color: _isRecording ? AppTheme.primary : Colors.grey[200]!,
+                    // 録音中は primary border に上書き
+                    color: _isRecording ? AppTheme.primary : AppTheme.grey200,
                     width: _isRecording ? 2 : 1,
                   ),
                 ),
@@ -182,7 +252,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
                                 '認識中',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey[500],
+                                  color: AppTheme.grey500,
                                 ),
                               ),
                             ],
@@ -233,12 +303,15 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
                       width: 80,
                       height: 80,
                       decoration: BoxDecoration(
-                        color: _isRecording ? AppTheme.error : AppTheme.primary,
+                        color: _isRecording
+                            ? AppTheme.error
+                            : AppTheme.primary,
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: (_isRecording ? AppTheme.error : AppTheme.primary)
-                                .withValues(alpha: 0.3),
+                            color:
+                                (_isRecording ? AppTheme.error : AppTheme.primary)
+                                    .withValues(alpha: 0.3),
                             blurRadius: 16,
                             offset: const Offset(0, 4),
                           ),
@@ -258,7 +331,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
                         : '録音開始',
                     style: TextStyle(
                       fontSize: 14,
-                      color: _isRecording ? AppTheme.error : Colors.grey[500],
+                      color: _isRecording ? AppTheme.error : AppTheme.grey500,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -269,8 +342,9 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   String get _formattedTime {
     final minutes = _elapsedSeconds ~/ 60;
@@ -279,7 +353,6 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
   }
 
   Future<void> _startRecording() async {
-    // マイク権限チェック
     final status = await Permission.microphone.request();
     if (!status.isGranted) {
       if (mounted) {
@@ -290,7 +363,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
       return;
     }
 
-    if (_isProcessing) return; // 停止処理中は開始しない
+    if (_isProcessing) return;
 
     final speechService = ref.read(speechRecognitionServiceProvider);
     final available = await speechService.initialize();
@@ -318,7 +391,6 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
       _elapsedSeconds = 0;
     });
 
-    // タイマー開始
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() => _elapsedSeconds++);
       if (_elapsedSeconds >= _maxSeconds) {
@@ -334,7 +406,6 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
           _recognizedText = text;
           _partialText = text;
         });
-        // 即時中断モードのみ自動停止
         if (_mode == RecognitionMode.immediate) {
           _stopRecording();
         }
@@ -369,13 +440,11 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
       _realtimeState = null;
     });
 
-    // 最後の認識結果が確定するまで少し待つ
     await Future.delayed(const Duration(milliseconds: 1200));
 
     final speechService = ref.read(speechRecognitionServiceProvider);
     await speechService.stopListening();
 
-    // 全文暗唱モード: _partialText は accumulated + 現在の部分結果を含む
     if (_mode == RecognitionMode.fullRecitation) {
       final accumulated = speechService.accumulatedText;
       if (_partialText.length > accumulated.length) {
@@ -398,7 +467,6 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
       return;
     }
 
-    // マッチング（ひらがな正規化＋許容ペア適用）
     final matcher = TextMatcher();
     final parentheses =
         TextNormalizer.parseParenthesesMode(_script.parenthesesMode);
@@ -412,7 +480,6 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
       allowedPairs: allowedPairs,
     );
 
-    // 進捗保存
     final progressRepo = ref.read(progressRepositoryProvider);
     await progressRepo.addSession(
       scriptId: widget.scriptId,
@@ -427,13 +494,22 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
     ref.read(scriptsListProvider.notifier).refresh();
 
     _isProcessing = false;
+
+    // Section 5-F: スコアアニメーション設定してから結果表示
+    _scoreAnim = Tween<double>(begin: 0, end: result.similarityScore).animate(
+      CurvedAnimation(parent: _scoreAnimCtrl, curve: Curves.easeOutCubic),
+    );
+
     setState(() {
       _matchResult = result;
       _showResult = true;
     });
+
+    _scoreAnimCtrl.forward(from: 0);
   }
 
-  Future<void> _markAsCorrect(String originalWord, String recognizedWord) async {
+  Future<void> _markAsCorrect(
+      String originalWord, String recognizedWord) async {
     final repo = ref.read(allowedPairsRepositoryProvider);
     if (repo.exists(widget.scriptId, originalWord, recognizedWord)) return;
 
@@ -456,7 +532,6 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
       );
     }
 
-    // スコアを再計算
     await _recalculateScore();
   }
 
@@ -476,7 +551,6 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
       allowedPairs: allowedPairs,
     );
 
-    // 進捗を更新
     final progressRepo = ref.read(progressRepositoryProvider);
     await progressRepo.updateScriptProgress(
         _script, result.similarityScore, 'voice', 4);
@@ -491,7 +565,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
     if (_partialText.isEmpty && !_isRecording) {
       return Text(
         '録音ボタンを押して暗唱してください',
-        style: TextStyle(fontSize: 16, height: 1.8, color: Colors.grey[400]),
+        style: TextStyle(fontSize: 16, height: 1.8, color: AppTheme.grey400),
       );
     }
 
@@ -538,6 +612,10 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/detail/${widget.scriptId}'),
+        ),
         title: const Text('暗記確認結果'),
         automaticallyImplyLeading: false,
       ),
@@ -545,23 +623,32 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // スコア表示
+            // Section 5-F: カウントアップアニメーション
             const SizedBox(height: 16),
-            Text(
-              '${result.similarityScore.toStringAsFixed(0)}%',
-              style: TextStyle(
-                fontSize: 64,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.scoreColor(result.similarityScore),
-              ),
-            ),
-            Text(
-              result.scoreLabel,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.scoreColor(result.similarityScore),
-              ),
+            AnimatedBuilder(
+              animation: _scoreAnim,
+              builder: (context, child) {
+                return Column(
+                  children: [
+                    Text(
+                      '${_scoreAnim.value.toStringAsFixed(0)}%',
+                      style: TextStyle(
+                        fontSize: 64,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.scoreColor(result.similarityScore),
+                      ),
+                    ),
+                    Text(
+                      result.scoreLabel,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.scoreColor(result.similarityScore),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 24),
             // Diff 表示
@@ -580,7 +667,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
                   color: scoreDiff >= 0
                       ? AppTheme.secondary.withValues(alpha: 0.1)
                       : AppTheme.error.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                 ),
                 child: Text(
                   '前回: ${_previousScore!.toStringAsFixed(0)}% → 今回: ${result.similarityScore.toStringAsFixed(0)}% '
@@ -599,7 +686,8 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => context.go('/detail/${widget.scriptId}'),
+                    onPressed: () =>
+                        context.go('/detail/${widget.scriptId}'),
                     child: const Text('原文確認'),
                   ),
                 ),

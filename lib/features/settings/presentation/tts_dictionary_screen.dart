@@ -4,6 +4,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../models/tts_dictionary_entry.dart';
 import '../../tts/data/tts_dictionary_repository.dart';
 
+import 'import_tts_csv_dialog.dart';
+
 class TtsDictionaryScreen extends ConsumerWidget {
   const TtsDictionaryScreen({super.key});
 
@@ -14,6 +16,18 @@ class TtsDictionaryScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('読み上げ辞書'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.file_upload),
+            tooltip: 'CSVインポート',
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (_) => const ImportTtsCsvDialog(),
+              );
+            },
+          ),
+        ],
       ),
       body: entries.isEmpty
           ? Center(
