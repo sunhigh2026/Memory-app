@@ -100,6 +100,11 @@ class ProgressRepository {
       print('[progress_repository] Leveled Up! New level: ${script.currentLevel}');
     }
 
+    if (mode == 'voice' && score >= 80 && level == script.currentLevel && script.currentLevel >= 4 && script.currentLevel < 7) {
+      script.currentLevel++;
+      print('[progress_repository] Voice Leveled Up! New level: ${script.currentLevel}');
+    }
+
     // 間違えた単語のカウントを増やす
     if (mistakes.isNotEmpty) {
       final map = Map<String, int>.from(script.mistakeWords ?? {});

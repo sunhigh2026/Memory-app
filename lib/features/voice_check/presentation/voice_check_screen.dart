@@ -540,13 +540,13 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
     await progressRepo.addSession(
       scriptId: widget.scriptId,
       mode: 'voice',
-      level: 4,
+      level: widget.level,
       score: result.similarityScore,
       durationSeconds: _elapsedSeconds,
       recognizedText: _recognizedText,
     );
     await progressRepo.updateScriptProgress(
-        _script, result.similarityScore, 'voice', 4);
+        _script, result.similarityScore, 'voice', widget.level);
     ref.read(scriptsListProvider.notifier).refresh();
 
     _isProcessing = false;
@@ -609,7 +609,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
 
     final progressRepo = ref.read(progressRepositoryProvider);
     await progressRepo.updateScriptProgress(
-        _script, result.similarityScore, 'voice', 4);
+        _script, result.similarityScore, 'voice', widget.level);
     ref.read(scriptsListProvider.notifier).refresh();
 
     setState(() {
