@@ -18,7 +18,8 @@ abstract class SpeechRecognitionService {
     required Function(String) onResult,
     required Function(String) onPartialResult,
     required Function(String) onError,
-    RecognitionMode mode = RecognitionMode.immediate,
+    Function()? onListeningStarted,
+    RecognitionMode mode = RecognitionMode.fullRecitation,
     Duration listenFor = const Duration(seconds: 60),
   });
   Future<void> stopListening();
@@ -39,14 +40,18 @@ class NativeSpeechRecognition implements SpeechRecognitionService {
   Function(String)? _onResult;
   Function(String)? _onPartialResult;
   Function(String)? _onError;
+  Function()? _onListeningStarted;
   Duration _listenFor = const Duration(seconds: 60);
+
+  bool _isInitialized = false;
 
   @override
   String get accumulatedText => _accumulatedText;
 
   @override
   Future<bool> initialize() async {
-    return await _speech.initialize(
+    if (_isInitialized) return true;
+    final available = await _speech.initialize(
       onError: (error) {
         if (_currentMode == RecognitionMode.fullRecitation && !_stopping) {
           // 全文暗唱モードではエラー時も自動再開を試みる
@@ -57,6 +62,10 @@ class NativeSpeechRecognition implements SpeechRecognitionService {
         }
       },
     );
+    if (available) {
+      _isInitialized = true;
+    }
+    return available;
   }
 
   @override
@@ -64,7 +73,8 @@ class NativeSpeechRecognition implements SpeechRecognitionService {
     required Function(String) onResult,
     required Function(String) onPartialResult,
     required Function(String) onError,
-    RecognitionMode mode = RecognitionMode.immediate,
+    Function()? onListeningStarted,
+    RecognitionMode mode = RecognitionMode.fullRecitation,
     Duration listenFor = const Duration(seconds: 60),
   }) async {
     _isListening = true;
@@ -74,12 +84,15 @@ class NativeSpeechRecognition implements SpeechRecognitionService {
     _onResult = onResult;
     _onPartialResult = onPartialResult;
     _onError = onError;
+    _onListeningStarted = onListeningStarted;
     _listenFor = listenFor;
 
     await _startListeningInternal();
   }
 
   Future<void> _startListeningInternal() async {
+    _onListeningStarted?.call();
+
     await _speech.listen(
       onResult: (result) {
         if (_stopping) return;
@@ -108,7 +121,7 @@ class NativeSpeechRecognition implements SpeechRecognitionService {
         }
       },
       listenFor: _listenFor,
-      pauseFor: const Duration(seconds: 3),
+      pauseFor: const Duration(seconds: 10),
       localeId: 'ja-JP',
       listenOptions: SpeechListenOptions(
         partialResults: true,

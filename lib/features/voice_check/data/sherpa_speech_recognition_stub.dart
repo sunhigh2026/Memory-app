@@ -22,7 +22,8 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
     required Function(String) onResult,
     required Function(String) onPartialResult,
     required Function(String) onError,
-    RecognitionMode mode = RecognitionMode.immediate,
+    Function()? onListeningStarted,
+    RecognitionMode mode = RecognitionMode.fullRecitation,
     Duration listenFor = const Duration(seconds: 60),
   }) async {
     onError('sherpa-onnxはWeb環境では使用できません');

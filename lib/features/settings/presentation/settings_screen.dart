@@ -229,6 +229,70 @@ class SettingsScreen extends ConsumerWidget {
                   '本番日が設定されているテキストは本番日スケジュールが優先されます。',
                   style: TextStyle(fontSize: 12, color: AppTheme.grey500),
                 ),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 12),
+                const Text('目標設定モード', style: TextStyle(fontSize: 16)),
+                const SizedBox(height: 8),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(
+                      value: 'auto',
+                      label: Text('自動 (要復習件数)'),
+                      icon: Icon(Icons.auto_awesome, size: 16),
+                    ),
+                    ButtonSegment(
+                      value: 'manual',
+                      label: Text('手動 (カスタム)'),
+                      icon: Icon(Icons.edit, size: 16),
+                    ),
+                  ],
+                  selected: {ref.watch(goalSettingModeProvider)},
+                  onSelectionChanged: (newSelection) {
+                    ref.read(goalSettingModeProvider.notifier).setMode(newSelection.first);
+                  },
+                  style: const ButtonStyle(
+                    textStyle: WidgetStatePropertyAll(TextStyle(fontSize: 13)),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  ref.watch(goalSettingModeProvider) == 'auto'
+                      ? '本日の「要復習」カード件数を自動的に今日の目標練習回数に設定します。'
+                      : '自分で設定した目標練習回数を今日の目標に設定します。',
+                  style: TextStyle(fontSize: 12, color: AppTheme.grey500),
+                ),
+                if (ref.watch(goalSettingModeProvider) == 'manual') ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('1日の目標練習回数', style: TextStyle(fontSize: 16)),
+                      Text(
+                        '${ref.watch(dailyGoalProvider)}回',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Slider(
+                    value: ref.watch(dailyGoalProvider).toDouble(),
+                    min: 5,
+                    max: 50,
+                    divisions: 9,
+                    label: '${ref.watch(dailyGoalProvider)}回',
+                    onChanged: (value) {
+                      ref.read(dailyGoalProvider.notifier).setGoal(value.round());
+                    },
+                  ),
+                  Text(
+                    '1日に達成したい目標練習回数（カードを1回練習＝1セッション）を設定します。',
+                    style: TextStyle(fontSize: 12, color: AppTheme.grey500),
+                  ),
+                ],
               ],
             ),
           ),
@@ -259,7 +323,51 @@ class SettingsScreen extends ConsumerWidget {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => context.push('/settings/how-to-use'),
                 ),
+                const Divider(height: 1),
               ],
+            ),
+          ),
+          const SizedBox(height: 32),
+          Center(
+            child: TextButton.icon(
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.grey500,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                minimumSize: const Size(0, 36),
+              ),
+              onPressed: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('すべてをリセットの確認'),
+                    content: const Text(
+                      '本当にすべての暗記テキストを削除し、初期状態にリセットしますか？\n'
+                      'この操作は取り消せません。',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('キャンセル'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppTheme.error,
+                        ),
+                        child: const Text('リセットする'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true && context.mounted) {
+                  await ref.read(scriptsListProvider.notifier).deleteAllScripts();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('すべてのテキストを削除し、リセットしました')),
+                  );
+                }
+              },
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('すべてをリセット', style: TextStyle(fontSize: 12)),
             ),
           ),
         ],

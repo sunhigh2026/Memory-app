@@ -15,7 +15,7 @@ class SectionHeader extends StatelessWidget {
         children: [
           Text(title, style: AppTheme.sectionHeader),
           const Spacer(),
-          ?trailing,
+          if (trailing != null) trailing!,
         ],
       ),
     );

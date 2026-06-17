@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../scripts/data/scripts_repository.dart';
 import '../../progress/data/progress_repository.dart';
+import '../../../models/script.dart';
 
 class PracticeResultScreen extends ConsumerStatefulWidget {
   final String scriptId;
@@ -140,12 +141,19 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
   Widget build(BuildContext context) {
     final passed = widget.score >= 80;
     final scripts = ref.watch(scriptsListProvider);
-    final script = scripts.cast<dynamic>().firstWhere(
-          (s) => s.id == widget.scriptId,
+    final script = scripts.cast<Script?>().firstWhere(
+          (s) => s?.id == widget.scriptId,
           orElse: () => null,
         );
     final leveledUp =
         passed && script != null && script.currentLevel > widget.level;
+
+    final sortedScripts = List<Script>.from(scripts)
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    final currentIndex = sortedScripts.indexWhere((s) => s.id == widget.scriptId);
+    final nextScript = (currentIndex != -1 && currentIndex < sortedScripts.length - 1)
+        ? sortedScripts[currentIndex + 1]
+        : null;
 
     return PopScope(
       canPop: false,
@@ -274,28 +282,69 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
               ),
               const SizedBox(height: 32),
               // ボタン
-              Row(
+              Column(
                 children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () =>
-                          context.go('/detail/${widget.scriptId}'),
-                      child: const Text('詳細に戻る'),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () =>
+                              context.go('/detail/${widget.scriptId}'),
+                          child: const Text('詳細に戻る'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            final nextLevel = passed ? widget.level + 1 : widget.level;
+                            if (nextLevel >= 4) {
+                              context.pushReplacement(
+                                  '/voice-check/${widget.scriptId}/4');
+                            } else {
+                              context.pushReplacement(
+                                  '/practice/${widget.scriptId}/$nextLevel');
+                            }
+                          },
+                          child: Text(passed ? '次のレベルへ' : 'もう一度'),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        final level = passed && widget.level < 3
-                            ? widget.level + 1
-                            : widget.level;
-                        context.pushReplacement(
-                            '/practice/${widget.scriptId}/$level');
-                      },
-                      child: Text(passed && widget.level < 3 ? '次のレベルへ' : 'もう一度'),
+                  if (nextScript != null && passed) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          context.pushReplacement(
+                              '/practice/${nextScript.id}/${widget.level}');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.secondary,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('次の問題へ'),
+                      ),
                     ),
-                  ),
+                  ],
+                  if (!passed && widget.level > 0) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          context.pushReplacement(
+                              '/practice/${widget.scriptId}/${widget.level - 1}');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.grey600,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('レベルを下げて再チャレンジ'),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ],

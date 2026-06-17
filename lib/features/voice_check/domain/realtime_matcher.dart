@@ -109,7 +109,7 @@ class RealtimeMatcher {
 
     for (int i = 0; i < processed.length; i++) {
       final char = processed[i];
-      if (RegExp(r'[。、！？!?,.\s\n\r　]').hasMatch(char)) continue;
+      if (RegExp(r'[。、！？!?,.\s\n\r　・①-⑳㉑-㊿\d０-９\-‐―—]').hasMatch(char)) continue;
 
       final rune = char.runes.first;
       int normalizedRune = rune;

@@ -15,7 +15,10 @@ class ImportCsvDialog extends ConsumerStatefulWidget {
 
 class _ImportCsvDialogState extends ConsumerState<ImportCsvDialog> {
   bool _isImporting = false;
-  String _statusMessage = 'CSVファイル（タイトル, 本文, タグ）を選択してください。';
+  bool _isImported = false;
+  String _statusMessage = 'CSVファイルを選択してください。\n'
+      '（タイトル, 本文, タグ, 本番日, 通し番号）または\n'
+      '（通し番号, タイトル, 本文, タグ, 本番日）の形式に対応しています。';
 
   Future<void> _importCsv() async {
     setState(() {
@@ -25,8 +28,7 @@ class _ImportCsvDialogState extends ConsumerState<ImportCsvDialog> {
 
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['csv'],
+        type: FileType.any, // クラウドやAndroid SAFでCSVがグレーアウトする問題を防ぐためanyを使用
         withData: true,
       );
 
@@ -39,18 +41,28 @@ class _ImportCsvDialogState extends ConsumerState<ImportCsvDialog> {
       }
 
       final file = result.files.single;
+      final ext = file.extension?.toLowerCase() ?? '';
+      // 拡張子チェックを緩和（警告を出力しつつ処理を継続）
+      if (ext != 'csv' && !file.name.toLowerCase().endsWith('.csv')) {
+        debugPrint('警告: 選択されたファイルの拡張子が.csvではありません (${file.name})。解析を試みます。');
+      }
+
       setState(() {
         _statusMessage = 'ファイルを読み込み中...';
       });
 
       List<int> bytes;
-      if (file.path != null) {
-        final ioFile = File(file.path!);
-        bytes = await ioFile.readAsBytes();
-      } else if (file.bytes != null) {
+      if (file.bytes != null) {
         bytes = file.bytes!;
+      } else if (file.path != null) {
+        final ioFile = File(file.path!);
+        if (await ioFile.exists()) {
+          bytes = await ioFile.readAsBytes();
+        } else {
+          throw Exception('ファイルが見つかりません。ローカルの保存フォルダーから再度お試しください。');
+        }
       } else {
-        throw Exception('ファイルを読み込めませんでした。ローカルに保存してから再度お試しください。');
+        throw Exception('ファイルを読み込めませんでした。ローカルに一度ダウンロードして保存してから再度お試しください。');
       }
 
       String csvString;
@@ -68,48 +80,128 @@ class _ImportCsvDialogState extends ConsumerState<ImportCsvDialog> {
       });
 
       final rows = const CsvToListConverter().convert(csvString);
-      int importedCount = 0;
+      
+      // 1列目が通し番号の形式であるかを自動判定
+      bool hasLeadingSortOrder = false;
+      int scanCount = 0;
+      int sortOrderScore = 0;
+      for (var row in rows) {
+        if (row.isEmpty) continue;
+        if (row.length < 3) continue; // 2列以下の場合は判定不可
+        
+        final col0 = row[0].toString().trim();
+        final col1 = row[1].toString().trim();
+        final col2 = row[2].toString().trim();
+        
+        // 1列目が空でなく、半角英数字と一部の記号のみで、長さが10文字以下
+        final isCol0LookLikeId = col0.isNotEmpty && 
+            RegExp(r'^[a-zA-Z0-9\-_./]+$').hasMatch(col0) && 
+            col0.length <= 10;
+            
+        // 3列目（本文と想定）が2列目（タイトルと想定）より明らかに長く、かつ10文字以上
+        final isCol2MuchLonger = col2.length > col1.length * 1.5 && col2.length >= 10;
+        
+        if (isCol0LookLikeId && isCol2MuchLonger) {
+          sortOrderScore++;
+        } else {
+          sortOrderScore--;
+        }
+        
+        scanCount++;
+        if (scanCount >= 5) break;
+      }
+      
+      if (scanCount > 0 && sortOrderScore > 0) {
+        hasLeadingSortOrder = true;
+        debugPrint('CSVの1列目を通し番号（sortOrder）として認識しました。');
+      } else {
+        debugPrint('CSVの1列目をタイトルとして認識しました（従来のフォーマット）。');
+      }
 
+      int importedCount = 0;
       final notifier = ref.read(scriptsListProvider.notifier);
 
       for (var row in rows) {
-        if (row.length >= 2) {
-          final title = row[0].toString().trim();
-          final content = row[1].toString().trim();
-          
-          List<String> tags = [];
-          if (row.length >= 3) {
-            final tagsString = row[2].toString();
-            tags = tagsString
-                .split(RegExp(r'[,\s]+'))
-                .where((e) => e.isNotEmpty)
-                .toList();
-          }
+        if (row.isEmpty) continue;
 
-          DateTime? targetDate;
-          if (row.length >= 4) {
-            final dateStr = row[3].toString().trim();
-            if (dateStr.isNotEmpty) {
-              final normalized = dateStr.replaceAll('/', '-');
-              targetDate = DateTime.tryParse(normalized);
+        String title = '';
+        String content = '';
+        List<String> tags = [];
+        DateTime? targetDate;
+        int sortOrder = 0;
+
+        if (hasLeadingSortOrder) {
+          // 通し番号あり：[0]:通し番号, [1]:タイトル, [2]:本文, [3]:タグ, [4]:ターゲット日
+          if (row.length >= 3) {
+            final sortStr = row[0].toString().trim();
+            final cleanSortStr = sortStr.replaceAll(RegExp(r'\D'), '');
+            sortOrder = int.tryParse(cleanSortStr) ?? 0;
+
+            title = row[1].toString().trim();
+            content = row[2].toString().trim();
+
+            if (row.length >= 4) {
+              final tagsString = row[3].toString();
+              tags = tagsString
+                  .split(RegExp(r'[,\s]+'))
+                  .where((e) => e.isNotEmpty)
+                  .toList();
+            }
+
+            if (row.length >= 5) {
+              final dateStr = row[4].toString().trim();
+              if (dateStr.isNotEmpty) {
+                final normalized = dateStr.replaceAll('/', '-');
+                targetDate = DateTime.tryParse(normalized);
+              }
             }
           }
-          
-          if (title.isNotEmpty && content.isNotEmpty) {
-            await notifier.addScript(
-              title: title,
-              content: content,
-              tags: tags,
-              targetDate: targetDate,
-            );
-            importedCount++;
+        } else {
+          // 通し番号なし（従来通り）：[0]:タイトル, [1]:本文, [2]:タグ, [3]:ターゲット日, [4]:通し番号
+          if (row.length >= 2) {
+            title = row[0].toString().trim();
+            content = row[1].toString().trim();
+
+            if (row.length >= 3) {
+              final tagsString = row[2].toString();
+              tags = tagsString
+                  .split(RegExp(r'[,\s]+'))
+                  .where((e) => e.isNotEmpty)
+                  .toList();
+            }
+
+            if (row.length >= 4) {
+              final dateStr = row[3].toString().trim();
+              if (dateStr.isNotEmpty) {
+                final normalized = dateStr.replaceAll('/', '-');
+                targetDate = DateTime.tryParse(normalized);
+              }
+            }
+
+            if (row.length >= 5) {
+              final sortStr = row[4].toString().trim();
+              final cleanSortStr = sortStr.replaceAll(RegExp(r'\D'), '');
+              sortOrder = int.tryParse(cleanSortStr) ?? 0;
+            }
           }
+        }
+
+        if (title.isNotEmpty && content.isNotEmpty) {
+          await notifier.addScript(
+            title: title,
+            content: content,
+            tags: tags,
+            targetDate: targetDate,
+            sortOrder: sortOrder,
+          );
+          importedCount++;
         }
       }
 
       setState(() {
         _statusMessage = '$importedCount 件のテキストをインポートしました！';
         _isImporting = false;
+        _isImported = true;
       });
     } catch (e) {
       setState(() {
@@ -135,9 +227,9 @@ class _ImportCsvDialogState extends ConsumerState<ImportCsvDialog> {
         if (!_isImporting)
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('閉じる'),
+            child: Text(_isImported ? 'OK' : '閉じる'),
           ),
-        if (!_isImporting)
+        if (!_isImporting && !_isImported)
           ElevatedButton(
             onPressed: _importCsv,
             child: const Text('ファイルを選択'),

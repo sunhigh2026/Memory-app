@@ -1,4 +1,10 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
 part of 'allowed_pair.dart';
+
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
 
 class AllowedPairAdapter extends TypeAdapter<AllowedPair> {
   @override
@@ -7,10 +13,9 @@ class AllowedPairAdapter extends TypeAdapter<AllowedPair> {
   @override
   AllowedPair read(BinaryReader reader) {
     final numOfFields = reader.readByte();
-    final fields = <int, dynamic>{};
-    for (int i = 0; i < numOfFields; i++) {
-      fields[reader.readByte()] = reader.read();
-    }
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
     return AllowedPair(
       id: fields[0] as String,
       scriptId: fields[1] as String,
@@ -18,7 +23,7 @@ class AllowedPairAdapter extends TypeAdapter<AllowedPair> {
       recognizedWord: fields[3] as String,
       originalHira: fields[4] as String,
       recognizedHira: fields[5] as String,
-      createdAt: fields[6] as DateTime,
+      createdAt: fields[6] as DateTime?,
     );
   }
 

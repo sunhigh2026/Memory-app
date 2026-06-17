@@ -4,10 +4,13 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Phase 2: カメラ（OCR撮影） -->
     <uses-permission android:name="android.permission.CAMERA"/>
-    <!-- TTS用 -->
+    <!-- TTS & 音声認識用 -->
     <queries>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
         </intent>
     </queries>
     <application

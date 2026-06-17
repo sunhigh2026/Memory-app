@@ -16,7 +16,12 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
   bool _isListening = false;
   bool _stopping = false;
   String _accumulatedText = '';
-  RecognitionMode _currentMode = RecognitionMode.immediate;
+  RecognitionMode _currentMode = RecognitionMode.fullRecitation;
+
+  // デバッグ用状態管理
+  DateTime? _recordingStartTime;
+  int _totalSamplesReceived = 0;
+  bool _firstChunkReceived = false;
 
   // コールバック
   Function(String)? _onResult;
@@ -37,8 +42,11 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
   @override
   bool get isListening => _isListening;
 
+  bool _isInitialized = false;
+
   @override
   Future<bool> initialize() async {
+    if (_isInitialized) return true;
     try {
       // モデルの存在確認
       if (!await _downloadService.isModelDownloaded()) {
@@ -87,6 +95,7 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
 
       _vad = sherpa.VoiceActivityDetector(config: vadConfig, bufferSizeInSeconds: 60);
 
+      _isInitialized = true;
       return true;
     } catch (e) {
       _onError?.call('初期化エラー: $e');
@@ -99,7 +108,8 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
     required Function(String) onResult,
     required Function(String) onPartialResult,
     required Function(String) onError,
-    RecognitionMode mode = RecognitionMode.immediate,
+    Function()? onListeningStarted,
+    RecognitionMode mode = RecognitionMode.fullRecitation,
     Duration listenFor = const Duration(seconds: 60),
   }) async {
     if (_recognizer == null) {
@@ -115,6 +125,13 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
     _onResult = onResult;
     _onPartialResult = onPartialResult;
     _onError = onError;
+
+    // デバッグ状態初期化
+    _recordingStartTime = DateTime.now();
+    _totalSamplesReceived = 0;
+    _firstChunkReceived = false;
+    // ignore: avoid_print
+    print('【音声認識】録音開始要求: $mode, 設定: 16kHz Mono');
 
     try {
       // 音声ストリームを開始（PCM 16bit, 16kHz, mono）
@@ -135,6 +152,9 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
           _onError?.call('音声取得エラー: $error');
         },
       );
+
+      // ストリーム確立完了後、音声認識が完全に開始されたことをコールバックで通知
+      onListeningStarted?.call();
     } catch (e) {
       _isListening = false;
       onError('録音開始エラー: $e');
@@ -144,6 +164,15 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
   /// 音声チャンクを処理
   void _processAudioChunk(Uint8List bytes) {
     if (_stopping || !_isListening) return;
+
+    if (!_firstChunkReceived) {
+      _firstChunkReceived = true;
+      final elapsed = DateTime.now().difference(_recordingStartTime!);
+      // ignore: avoid_print
+      print('【音声認識】最初の音声チャンク受信完了: ${elapsed.inMilliseconds}ms');
+    }
+
+    _totalSamplesReceived += bytes.length ~/ 2; // pcm16bits なので 2bytes = 1sample
 
     // PCM 16bit LE → Float32 に変換
     final samples = _bytesToFloat32(bytes);
@@ -192,7 +221,15 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
 
   @override
   Future<void> stopListening() async {
+    if (_stopping || !_isListening) return;
     _stopping = true;
+
+    // ignore: avoid_print
+    print('【音声認識】録音停止要求. 最後のマイクバッファ回収のため250ms待機します... (総受信サンプル数: $_totalSamplesReceived)');
+
+    // マイクバッファにたまっている音声が処理されるよう少し待つ
+    await Future.delayed(const Duration(milliseconds: 250));
+
     _isListening = false;
 
     _audioSubscription?.cancel();

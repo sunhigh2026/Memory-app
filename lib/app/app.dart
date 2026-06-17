@@ -107,7 +107,16 @@ final _router = GoRouter(
       path: '/voice-check/:id',
       pageBuilder: (context, state) {
         final id = state.pathParameters['id']!;
-        return _fadePage(context, state, VoiceCheckScreen(scriptId: id));
+        return _fadePage(context, state, VoiceCheckScreen(scriptId: id, level: 4));
+      },
+    ),
+    GoRoute(
+      path: '/voice-check/:id/:level',
+      pageBuilder: (context, state) {
+        final id = state.pathParameters['id']!;
+        final level = int.tryParse(state.pathParameters['level'] ?? '') ?? 4;
+        return _fadePage(
+            context, state, VoiceCheckScreen(scriptId: id, level: level));
       },
     ),
     GoRoute(

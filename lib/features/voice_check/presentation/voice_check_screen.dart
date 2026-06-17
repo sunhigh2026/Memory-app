@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:budoux/budoux.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/text_normalizer.dart';
 import '../../scripts/data/scripts_repository.dart';
@@ -16,10 +17,18 @@ import 'diff_result_widget.dart';
 import '../../../models/script.dart';
 import '../data/allowed_pairs_repository.dart';
 
+enum HintLevel {
+  showAll,            // Level 4
+  firstAndLastChars,  // Level 5 (文頭・文末)
+  particles,          // Level 6 (助詞)
+  hidden,             // Level 7 (完全暗唱)
+}
+
 class VoiceCheckScreen extends ConsumerStatefulWidget {
   final String scriptId;
+  final int level;
 
-  const VoiceCheckScreen({super.key, required this.scriptId});
+  const VoiceCheckScreen({super.key, required this.scriptId, required this.level});
 
   @override
   ConsumerState<VoiceCheckScreen> createState() => _VoiceCheckScreenState();
@@ -29,9 +38,12 @@ class VoiceCheckScreen extends ConsumerStatefulWidget {
 class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
     with TickerProviderStateMixin {
   late Script _script;
-  RecognitionMode _mode = RecognitionMode.immediate;
+  Script? _nextScript;
+  RecognitionMode _mode = RecognitionMode.fullRecitation;
   bool _isRecording = false;
-  bool _showOriginal = true;
+  late HintLevel _hintLevel;
+  bool _isListeningStarted = false;
+  late final _budouxParser = const Budoux();
   String _partialText = '';
   String _recognizedText = '';
   int _elapsedSeconds = 0;
@@ -44,6 +56,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
   RealtimeMatcher? _realtimeMatcher;
   RealtimeMatchState? _realtimeState;
   bool _isProcessing = false;
+  bool _showOriginal = true;
 
   // Section 5-F: スコアカウントアップアニメーション
   late final AnimationController _scoreAnimCtrl;
@@ -55,8 +68,28 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
   @override
   void initState() {
     super.initState();
+    switch (widget.level) {
+      case 5:
+        _hintLevel = HintLevel.firstAndLastChars;
+        break;
+      case 6:
+        _hintLevel = HintLevel.particles;
+        break;
+      case 7:
+        _hintLevel = HintLevel.hidden;
+        break;
+      case 4:
+      default:
+        _hintLevel = HintLevel.showAll;
+        break;
+    }
     _loadData();
-    // Section 5-F: AnimationController 初期化
+    
+    // 音声認識サービスの初期化をあらかじめバックグラウンドで開始しておく
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(speechRecognitionServiceProvider).initialize();
+    });
+
     _scoreAnimCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -66,10 +99,20 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
 
   void _loadData() {
     final scripts = ref.read(scriptsListProvider);
+    final sortedScripts = List<Script>.from(scripts)
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    final currentIndex = sortedScripts.indexWhere((s) => s.id == widget.scriptId);
+    _nextScript = (currentIndex != -1 && currentIndex < sortedScripts.length - 1)
+        ? sortedScripts[currentIndex + 1]
+        : null;
+
     _script = scripts.firstWhere((s) => s.id == widget.scriptId);
 
     final progressRepo = ref.read(progressRepositoryProvider);
     _previousScore = progressRepo.getPreviousScore(widget.scriptId, 'voice');
+
+    // レベル4〜7が対象なので、初期状態ではヒントあり、レベル7（完全暗唱）のみ非表示に初期化
+    _showOriginal = _hintLevel != HintLevel.hidden;
 
     setState(() => _initialized = true);
   }
@@ -145,79 +188,80 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
           ),
           title: const Text('音声暗記確認'),
         ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '「${_script.title}」',
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            // 原文表示エリア — Section 1-E: outlineDecoration
-            GestureDetector(
-              onTap: () => setState(() => _showOriginal = !_showOriginal),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: AppTheme.outlineDecoration,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          _showOriginal
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                          size: 16,
-                          color: AppTheme.grey500,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '原文（タップで表示/非表示）',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.grey500,
-                          ),
-                        ),
-                      ],
-                    ),
-                    // Section 5-C: AnimatedSize で原文の展開/折りたたみ
-                    AnimatedSize(
-                      duration: const Duration(milliseconds: 250),
-                      curve: Curves.easeInOut,
-                      child: _showOriginal
-                          ? Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text(
-                                _script.content,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  height: 1.8,
-                                  color: AppTheme.textDark,
-                                ),
-                              ),
-                            )
-                          : const SizedBox.shrink(),
-                    ),
-                  ],
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '「${_script.title}」',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            // 認識中テキスト
-            const Text(
-              '認識中のテキスト:',
-              style: TextStyle(fontSize: 14, color: AppTheme.textLight),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: Container(
+              const SizedBox(height: 16),
+              // 原文表示エリア — Section 1-E: outlineDecoration
+              GestureDetector(
+                onTap: () => setState(() => _showOriginal = !_showOriginal),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: AppTheme.outlineDecoration,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            _showOriginal
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                            size: 16,
+                            color: AppTheme.grey500,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '原文（タップで表示/非表示）',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.grey500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      // Section 5-C: AnimatedSize で原文の展開/折りたたみ
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeInOut,
+                        child: _showOriginal
+                            ? Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  _getHintText(_script.content, _hintLevel),
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    height: 1.8,
+                                    color: AppTheme.textDark,
+                                  ),
+                                ),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // 認識中テキスト
+              const Text(
+                '認識中のテキスト:',
+                style: TextStyle(fontSize: 14, color: AppTheme.textLight),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                height: 160,
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -244,15 +288,20 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
                                 height: 12,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: AppTheme.primary,
+                                  color: _isListeningStarted
+                                      ? AppTheme.secondary
+                                      : AppTheme.primary,
                                 ),
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                '認識中',
+                                _isListeningStarted ? 'お話しください 🎤' : '準備中...',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: AppTheme.grey500,
+                                  color: _isListeningStarted
+                                      ? AppTheme.secondary
+                                      : AppTheme.grey500,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ],
@@ -262,7 +311,6 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
                   ),
                 ),
               ),
-            ),
             const SizedBox(height: 12),
             // モード切替
             Center(
@@ -343,7 +391,8 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
         ),
       ),
     ),
-  );
+  ),
+);
 }
 
   String get _formattedTime {
@@ -386,6 +435,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
 
     setState(() {
       _isRecording = true;
+      _isListeningStarted = false;
       _partialText = '';
       _recognizedText = '';
       _elapsedSeconds = 0;
@@ -401,6 +451,11 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
     await speechService.startListening(
       mode: _mode,
       listenFor: Duration(seconds: _maxSeconds),
+      onListeningStarted: () {
+        if (mounted) {
+          setState(() => _isListeningStarted = true);
+        }
+      },
       onResult: (text) {
         setState(() {
           _recognizedText = text;
@@ -437,6 +492,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
     _realtimeMatcher?.reset();
     setState(() {
       _isRecording = false;
+      _isListeningStarted = false;
       _realtimeState = null;
     });
 
@@ -682,36 +738,168 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
               ),
             const SizedBox(height: 24),
             // ボタン
-            Row(
+            Column(
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () =>
-                        context.go('/detail/${widget.scriptId}'),
-                    child: const Text('原文確認'),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () =>
+                            context.go('/detail/${widget.scriptId}'),
+                        child: const Text('詳細に戻る'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          final passed = result.similarityScore >= 80;
+                          if (passed && widget.level < 7) {
+                            context.pushReplacement(
+                                '/voice-check/${widget.scriptId}/${widget.level + 1}');
+                          } else {
+                            _realtimeMatcher?.reset();
+                            setState(() {
+                              _showResult = false;
+                              _matchResult = null;
+                              _partialText = '';
+                              _recognizedText = '';
+                              _realtimeState = null;
+                            });
+                          }
+                        },
+                        child: Text((result.similarityScore >= 80 && widget.level < 7)
+                            ? '次のレベルへ'
+                            : 'もう一度挑戦'),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      _realtimeMatcher?.reset();
-                      setState(() {
-                        _showResult = false;
-                        _matchResult = null;
-                        _partialText = '';
-                        _recognizedText = '';
-                        _realtimeState = null;
-                      });
-                    },
-                    child: const Text('もう一度挑戦'),
+                if (_nextScript != null && result.similarityScore >= 80) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        context.pushReplacement('/voice-check/${_nextScript!.id}/${widget.level}');
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.secondary,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('次の問題へ'),
+                    ),
                   ),
-                ),
+                ],
+                if (result.similarityScore < 80 && widget.level > 1) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        final prevLevel = widget.level - 1;
+                        if (prevLevel <= 3) {
+                          context.pushReplacement(
+                              '/practice/${widget.scriptId}/$prevLevel');
+                        } else {
+                          context.pushReplacement(
+                              '/voice-check/${widget.scriptId}/$prevLevel');
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.grey600,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('レベルを下げて再チャレンジ'),
+                    ),
+                  ),
+                ],
               ],
             ),
           ],
         ),
       ),
     );
+  }
+  String _getHintText(String text, HintLevel level) {
+    switch (level) {
+      case HintLevel.showAll:
+        try {
+          final lines = text.split('\n');
+          final processedLines = lines.map((line) {
+            if (line.isEmpty) return '';
+            final chunks = _budouxParser.parse(line);
+            return chunks.join('　');
+          });
+          return processedLines.join('\n');
+        } catch (_) {
+          return text;
+        }
+      case HintLevel.firstAndLastChars:
+        return _applyFirstAndLastCharsHint(text);
+      case HintLevel.particles:
+        return _applyParticlesHint(text);
+      case HintLevel.hidden:
+        return '';
+    }
+  }
+
+  String _applyFirstAndLastCharsHint(String text) {
+    final lines = text.split('\n');
+    final resultLines = lines.map((line) {
+      if (line.isEmpty) return '';
+      
+      final punc = RegExp(r'[。、？！\s　]');
+      final validIndices = <int>[];
+      for (int i = 0; i < line.length; i++) {
+        if (!punc.hasMatch(line[i])) {
+          validIndices.add(i);
+        }
+      }
+
+      if (validIndices.length <= 4) {
+        return line;
+      }
+
+      final showIndices = {
+        validIndices[0],
+        validIndices[1],
+        validIndices[validIndices.length - 2],
+        validIndices[validIndices.length - 1]
+      };
+
+      final buffer = StringBuffer();
+      for (int i = 0; i < line.length; i++) {
+        final char = line[i];
+        if (punc.hasMatch(char) || showIndices.contains(i)) {
+          buffer.write(char);
+        } else {
+          buffer.write('＿');
+        }
+      }
+      return buffer.toString();
+    });
+    return resultLines.join('\n');
+  }
+
+  String _applyParticlesHint(String text) {
+    const particles = {'は', 'が', 'を', 'に', 'へ', 'と', 'で', 'も', 'の', 'か', 'や', 'から', 'より'};
+    final buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      final char = text[i];
+      if (particles.contains(char) ||
+          char == '。' ||
+          char == '、' ||
+          char == '\n' ||
+          char == '？' ||
+          char == '！' ||
+          char == ' ' ||
+          char == '　') {
+        buffer.write(char);
+      } else {
+        buffer.write('＿');
+      }
+    }
+    return buffer.toString();
   }
 }

@@ -1,4 +1,10 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
 part of 'tts_dictionary_entry.dart';
+
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
 
 class TtsDictionaryEntryAdapter extends TypeAdapter<TtsDictionaryEntry> {
   @override
@@ -7,10 +13,9 @@ class TtsDictionaryEntryAdapter extends TypeAdapter<TtsDictionaryEntry> {
   @override
   TtsDictionaryEntry read(BinaryReader reader) {
     final numOfFields = reader.readByte();
-    final fields = <int, dynamic>{};
-    for (int i = 0; i < numOfFields; i++) {
-      fields[reader.readByte()] = reader.read();
-    }
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
     return TtsDictionaryEntry(
       original: fields[0] as String,
       reading: fields[1] as String,

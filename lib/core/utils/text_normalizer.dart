@@ -14,8 +14,8 @@ class TextNormalizer {
     var result = text;
     // 括弧処理
     result = handleParentheses(result, parentheses);
-    // 句読点・空白・改行を除去
-    result = result.replaceAll(RegExp(r'[。、！？!?,.\s\n\r　]'), '');
+    // 句読点・空白・改行、および丸数字や中黒、ダッシュ、数字等の記号を除去
+    result = result.replaceAll(RegExp(r'[。、！？!?,.\s\n\r　・①-⑳㉑-㊿\d０-９\-‐―—]'), '');
     // 全角英数字を半角に変換
     result = _fullWidthToHalfWidth(result);
     // カタカナをひらがなに変換
@@ -42,7 +42,7 @@ class TextNormalizer {
   }) async {
     var result = text;
     result = handleParentheses(result, parentheses);
-    result = result.replaceAll(RegExp(r'[。、！？!?,.\s\n\r　]'), '');
+    result = result.replaceAll(RegExp(r'[。、！？!?,.\s\n\r　・①-⑳㉑-㊿\d０-９\-‐―—]'), '');
     result = _fullWidthToHalfWidth(result);
     result = await toHiragana(result);
     // toHiragana後にカタカナが残る場合もあるので二重変換
@@ -127,5 +127,63 @@ class TextNormalizer {
         .map((s) => s.trim())
         .where((s) => s.isNotEmpty)
         .toList();
+  }
+
+  /// レーベンシュタイン距離を計算する
+  static int levenshtein(String s, String t) {
+    if (s == t) return 0;
+    if (s.isEmpty) return t.length;
+    if (t.isEmpty) return s.length;
+
+    final v0 = List<int>.generate(t.length + 1, (i) => i);
+    final v1 = List<int>.filled(t.length + 1, 0);
+
+    for (int i = 0; i < s.length; i++) {
+      v1[0] = i + 1;
+
+      for (int j = 0; j < t.length; j++) {
+        final cost = (s.codeUnitAt(i) == t.codeUnitAt(j)) ? 0 : 1;
+        v1[j + 1] = _min3(v1[j] + 1, v0[j + 1] + 1, v0[j] + cost);
+      }
+
+      for (int j = 0; j < v0.length; j++) {
+        v0[j] = v1[j];
+      }
+    }
+
+    return v0[t.length];
+  }
+
+  static int _min3(int a, int b, int c) {
+    int m = a < b ? a : b;
+    return m < c ? m : c;
+  }
+
+  /// 文字数に応じた許容最大レーベンシュタイン距離を算出する
+  /// 短い語（3文字以下）で誤判定が起きないよう制限し、長い語では最大20%の誤認識を許容します。
+  static int maxAllowedDistance(int length) {
+    if (length <= 3) {
+      return 0; // 3文字以下は完全一致のみ（誤認識による誤判定を防ぐ）
+    } else if (length <= 6) {
+      return 1; // 4〜6文字は1文字までの誤認識を許容 (16.7% 〜 25%)
+    } else {
+      // 7文字以上は全体の20%までの誤認識を許容
+      // ただし、最低でも1文字は許容する
+      final calculated = (length * 0.20).floor();
+      return calculated > 1 ? calculated : 1;
+    }
+  }
+
+  /// ひらがなの読み同士を曖昧比較する
+  /// レーベンシュタイン距離が許容範囲内であれば true を返す
+  static bool isFuzzyMatch(String hira1, String hira2) {
+    if (hira1.isEmpty || hira2.isEmpty) return false;
+    if (hira1 == hira2) return true;
+
+    final dist = levenshtein(hira1, hira2);
+    // 正解の文字の長さ（hira2を正解と想定）を基準に閾値を決定
+    final maxDist = maxAllowedDistance(hira2.length);
+
+    return dist <= maxDist;
   }
 }

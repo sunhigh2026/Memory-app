@@ -22,9 +22,12 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   final _tagController = TextEditingController();
+  final _sortOrderController = TextEditingController();
+  final _pinnedWordController = TextEditingController();
   final _contentFocusNode = FocusNode();
   List<String> _tags = [];
   List<String> _tagSuggestions = [];
+  List<String> _pinnedClozeWords = [];
   String _parenthesesMode = 'stripContent';
   bool _isEditing = false;
 
@@ -66,9 +69,12 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
     );
     _titleController.text = script.title;
     _contentController.text = script.content;
+    _sortOrderController.text =
+        script.sortOrder > 0 ? script.sortOrder.toString() : '';
     setState(() {
       _tags = List<String>.from(script.tags);
       _parenthesesMode = script.parenthesesMode;
+      _pinnedClozeWords = List<String>.from(script.pinnedClozeWords);
     });
   }
 
@@ -77,6 +83,8 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
     _titleController.dispose();
     _contentController.dispose();
     _tagController.dispose();
+    _sortOrderController.dispose();
+    _pinnedWordController.dispose();
     _contentFocusNode.dispose();
     super.dispose();
   }
@@ -199,7 +207,68 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
                 ),
               ),
             const SizedBox(height: 16),
-            // 括弧の扱い
+            // 通し番号（sortOrder）入力欄
+            TextFormField(
+              controller: _sortOrderController,
+              decoration: const InputDecoration(
+                labelText: '通し番号（並び替え用）',
+                hintText: '例: 1, 2, 3 ...',
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 16),
+            // ピン留め重要語（pinnedClozeWords）入力欄
+            Text('穴埋め必須語（必ず穴にする語）',
+                style: const TextStyle(fontSize: 14, color: AppTheme.grey600)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: _pinnedClozeWords.map((word) {
+                return Chip(
+                  label: Text(word,
+                      style: const TextStyle(fontSize: 13)),
+                  deleteIcon:
+                      const Icon(Icons.close, size: 16),
+                  onDeleted: () {
+                    setState(() => _pinnedClozeWords.remove(word));
+                  },
+                  backgroundColor:
+                      AppTheme.primary.withValues(alpha: 0.12),
+                  side: BorderSide.none,
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _pinnedWordController,
+                    decoration: const InputDecoration(
+                      hintText: '穴埋め必須語を入力',
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                    ),
+                    onSubmitted: (_) => _addPinnedWord(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: _addPinnedWord,
+                  icon: const Icon(Icons.push_pin),
+                  color: AppTheme.primary,
+                ),
+              ],
+            ),
             Text(
               '括弧の扱い（音声確認時）',
               style: const TextStyle(fontSize: 14, color: AppTheme.grey600),
@@ -350,6 +419,16 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
     });
   }
 
+  /// 穴埋め必須語の追加
+  void _addPinnedWord() {
+    final word = _pinnedWordController.text.trim();
+    if (word.isEmpty || _pinnedClozeWords.contains(word)) return;
+    setState(() {
+      _pinnedClozeWords.add(word);
+      _pinnedWordController.clear();
+    });
+  }
+
   Future<void> _confirmDelete() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -382,6 +461,9 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
 
     final title = _titleController.text.trim();
     final content = _contentController.text.trim();
+    final sortOrderStr = _sortOrderController.text.trim();
+    final cleanSortOrderStr = sortOrderStr.replaceAll(RegExp(r'\D'), '');
+    final sortOrder = int.tryParse(cleanSortOrderStr) ?? 0;
     final notifier = ref.read(scriptsListProvider.notifier);
 
     if (_isEditing) {
@@ -392,6 +474,8 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
       script.tags = _tags;
       script.category = _tags.isNotEmpty ? _tags.first : '';
       script.parenthesesMode = _parenthesesMode;
+      script.sortOrder = sortOrder;
+      script.pinnedClozeWords = _pinnedClozeWords;
       await notifier.updateScript(script);
     } else {
       await notifier.addScript(
@@ -399,12 +483,15 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
         content: content,
         tags: _tags,
         parenthesesMode: _parenthesesMode,
+        sortOrder: sortOrder,
+        pinnedClozeWords: _pinnedClozeWords,
       );
     }
 
     if (mounted) context.pop();
   }
 }
+
 
 class _ImportButton extends StatelessWidget {
   final IconData icon;

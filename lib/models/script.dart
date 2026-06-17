@@ -71,6 +71,12 @@ class Script extends HiveObject {
   @HiveField(21)
   Map<String, int>? mistakeWords; // よく間違える単語とその回数
 
+  @HiveField(22, defaultValue: [])
+  late List<String> pinnedClozeWords; // 手動指定の重要語（穴埋め必須）
+
+  @HiveField(23, defaultValue: 0)
+  late int sortOrder; // 通し番号（ソート用）
+
   Script({
     required this.id,
     required this.title,
@@ -94,11 +100,14 @@ class Script extends HiveObject {
     List<DateTime>? generatedSchedule,
     this.scheduleIndex = 0,
     Map<String, int>? mistakeWords,
+    List<String>? pinnedClozeWords,
+    this.sortOrder = 0,
   })  : createdAt = createdAt ?? DateTime.now(),
         clozeWords = clozeWords ?? [],
         tags = tags ?? [],
         generatedSchedule = generatedSchedule ?? [],
-        mistakeWords = mistakeWords ?? {};
+        mistakeWords = mistakeWords ?? {},
+        pinnedClozeWords = pinnedClozeWords ?? [];
 
   double get progressPercent {
     switch (currentLevel) {

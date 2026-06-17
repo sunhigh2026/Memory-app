@@ -25,17 +25,72 @@ class AppSettingsRepository {
         : SpeechEngineType.native;
   }
 
+  static const String _keyDailyGoal = 'dailyGoal';
+  static const String _keyGoalSettingMode = 'goalSettingMode';
+
   Future<void> setSpeechEngine(SpeechEngineType type) async {
     await _box.put(
       _keySpeechEngine,
       type == SpeechEngineType.sherpaOnnx ? 'sherpaOnnx' : 'native',
     );
   }
+
+  int getDailyGoal() {
+    return _box.get(_keyDailyGoal, defaultValue: 10) as int;
+  }
+
+  Future<void> setDailyGoal(int goal) async {
+    await _box.put(_keyDailyGoal, goal);
+  }
+
+  String getGoalSettingMode() {
+    return _box.get(_keyGoalSettingMode, defaultValue: 'manual') as String;
+  }
+
+  Future<void> setGoalSettingMode(String mode) async {
+    await _box.put(_keyGoalSettingMode, mode);
+  }
 }
 
 final appSettingsRepositoryProvider = Provider<AppSettingsRepository>((ref) {
   return AppSettingsRepository();
 });
+
+/// 目標設定モードの状態プロバイダ ('auto' / 'manual')
+final goalSettingModeProvider =
+    StateNotifierProvider<GoalSettingModeNotifier, String>((ref) {
+  final repo = ref.watch(appSettingsRepositoryProvider);
+  return GoalSettingModeNotifier(repo);
+});
+
+class GoalSettingModeNotifier extends StateNotifier<String> {
+  final AppSettingsRepository _repo;
+
+  GoalSettingModeNotifier(this._repo) : super(_repo.getGoalSettingMode());
+
+  Future<void> setMode(String mode) async {
+    await _repo.setGoalSettingMode(mode);
+    state = mode;
+  }
+}
+
+/// 今日の目標練習回数の状態プロバイダ
+final dailyGoalProvider =
+    StateNotifierProvider<DailyGoalNotifier, int>((ref) {
+  final repo = ref.watch(appSettingsRepositoryProvider);
+  return DailyGoalNotifier(repo);
+});
+
+class DailyGoalNotifier extends StateNotifier<int> {
+  final AppSettingsRepository _repo;
+
+  DailyGoalNotifier(this._repo) : super(_repo.getDailyGoal());
+
+  Future<void> setGoal(int goal) async {
+    await _repo.setDailyGoal(goal);
+    state = goal;
+  }
+}
 
 /// 音声認識エンジン選択の状態プロバイダ
 final speechEngineTypeProvider =

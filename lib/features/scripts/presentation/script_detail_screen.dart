@@ -86,6 +86,38 @@ class ScriptDetailScreen extends ConsumerWidget {
                   height: 1.8,
                   color: AppTheme.textDark,
                 ),
+                contextMenuBuilder: (context, editableTextState) {
+                  final buttonItems = editableTextState.contextMenuButtonItems;
+                  buttonItems.add(ContextMenuButtonItem(
+                    label: '重要に追加',
+                    onPressed: () async {
+                      final selection = editableTextState.currentTextEditingValue.selection;
+                      final text = editableTextState.currentTextEditingValue.text;
+                      if (selection.isValid && !selection.isCollapsed) {
+                        final selectedText = selection.textInside(text);
+                        if (selectedText.isNotEmpty) {
+                          final currentPinned = List<String>.from(script.pinnedClozeWords);
+                          if (!currentPinned.contains(selectedText)) {
+                            currentPinned.add(selectedText);
+                            script.pinnedClozeWords = currentPinned;
+                            await script.save();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('「$selectedText」を重要に追加しました')),
+                              );
+                              ref.read(scriptsListProvider.notifier).refresh();
+                            }
+                          }
+                        }
+                      }
+                      editableTextState.hideToolbar();
+                    },
+                  ));
+                  return AdaptiveTextSelectionToolbar.buttonItems(
+                    anchors: editableTextState.contextMenuAnchors,
+                    buttonItems: buttonItems,
+                  );
+                },
               ),
             ),
             const SizedBox(height: 16),
@@ -108,7 +140,7 @@ class ScriptDetailScreen extends ConsumerWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => context.push('/voice-check/${script.id}'),
+                    onPressed: () => _showVoiceLevelSelectionBottomSheet(context, script),
                     icon: const Icon(Icons.mic),
                     label: const Text('音声で確認'),
                     style: ElevatedButton.styleFrom(
@@ -256,6 +288,125 @@ class ScriptDetailScreen extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: AppTheme.primary,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'おすすめ',
+                  style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(description, style: TextStyle(fontSize: 12, color: AppTheme.grey500)),
+        ),
+        trailing: const Icon(Icons.chevron_right, size: 20),
+      ),
+    );
+  }
+
+  void _showVoiceLevelSelectionBottomSheet(BuildContext context, Script script) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              '暗記確認レベルを選択',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textDark),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            _buildVoiceLevelTile(
+              context: context,
+              level: 4,
+              title: 'Level 4: 全文表示',
+              description: '原文を表示した状態で、音声で暗唱を確認します。',
+              recommended: script.currentLevel == 4 || script.currentLevel < 4,
+              scriptId: script.id,
+            ),
+            const SizedBox(height: 12),
+            _buildVoiceLevelTile(
+              context: context,
+              level: 5,
+              title: 'Level 5: 文頭・文末ヒント',
+              description: '文頭と文末の文字のみ表示した状態で暗唱します。',
+              recommended: script.currentLevel == 5,
+              scriptId: script.id,
+            ),
+            const SizedBox(height: 12),
+            _buildVoiceLevelTile(
+              context: context,
+              level: 6,
+              title: 'Level 6: 助詞ヒント',
+              description: '助詞（は、が、を等）のみ表示した状態で暗唱します。',
+              recommended: script.currentLevel == 6,
+              scriptId: script.id,
+            ),
+            const SizedBox(height: 12),
+            _buildVoiceLevelTile(
+              context: context,
+              level: 7,
+              title: 'Level 7: 完全暗唱',
+              description: 'ヒントなし（全非表示）の状態で暗唱します。',
+              recommended: script.currentLevel >= 7,
+              scriptId: script.id,
+            ),
+            const SizedBox(height: 20),
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('キャンセル'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVoiceLevelTile({
+    required BuildContext context,
+    required int level,
+    required String title,
+    required String description,
+    required bool recommended,
+    required String scriptId,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: recommended ? AppTheme.secondary.withValues(alpha: 0.04) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: recommended ? AppTheme.secondary : AppTheme.grey200,
+          width: recommended ? 2 : 1,
+        ),
+      ),
+      child: ListTile(
+        onTap: () {
+          Navigator.of(context).pop(); // ボトムシートを閉じる
+          context.push('/voice-check/$scriptId/$level');
+        },
+        title: Row(
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            if (recommended) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.secondary,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: const Text(

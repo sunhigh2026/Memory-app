@@ -22,6 +22,30 @@ class ScriptsRepository {
       }
     }
 
+    // 自動マイグレーション: sortOrderが0のものに連番を付与する（既存データの修復）
+    bool hasZeroOrder = false;
+    for (final s in scripts) {
+      if (s.sortOrder == 0) {
+        hasZeroOrder = true;
+        break;
+      }
+    }
+    if (hasZeroOrder) {
+      int maxOrder = 0;
+      for (final s in scripts) {
+        if (s.sortOrder > maxOrder) {
+          maxOrder = s.sortOrder;
+        }
+      }
+      for (final s in scripts) {
+        if (s.sortOrder == 0) {
+          maxOrder++;
+          s.sortOrder = maxOrder;
+          s.save();
+        }
+      }
+    }
+
     scripts.sort((a, b) {
       final aTime = a.lastPracticedAt;
       final bTime = b.lastPracticedAt;
@@ -47,6 +71,8 @@ class ScriptsRepository {
     required List<String> tags,
     String parenthesesMode = 'stripContent',
     DateTime? targetDate,
+    int sortOrder = 0,
+    List<String>? pinnedClozeWords,
   }) async {
     final parentheses = TextNormalizer.parseParenthesesMode(parenthesesMode);
     final hiragana = await TextNormalizer.fullNormalize(
@@ -66,6 +92,19 @@ class ScriptsRepository {
       }
     }
 
+    int finalSortOrder = sortOrder;
+    if (finalSortOrder == 0) {
+      final currentScripts = _box.values;
+      if (currentScripts.isNotEmpty) {
+        final maxOrder = currentScripts
+            .map((s) => s.sortOrder)
+            .reduce((curr, next) => curr > next ? curr : next);
+        finalSortOrder = maxOrder + 1;
+      } else {
+        finalSortOrder = 1;
+      }
+    }
+
     final script = Script(
       id: _uuid.v4(),
       title: title,
@@ -77,6 +116,8 @@ class ScriptsRepository {
       targetDate: targetDate,
       generatedSchedule: generatedSchedule,
       nextReviewAt: nextReviewAt,
+      sortOrder: finalSortOrder,
+      pinnedClozeWords: pinnedClozeWords ?? [],
     );
     await _box.add(script);
     return script;
@@ -94,6 +135,43 @@ class ScriptsRepository {
 
   Future<void> delete(Script script) async {
     await script.delete();
+  }
+
+  Future<void> deleteAll() async {
+    await _box.clear();
+  }
+
+  Future<void> deleteMultiple(List<String> ids) async {
+    for (final id in ids) {
+      final script = getById(id);
+      if (script != null) {
+        await script.delete();
+      }
+    }
+  }
+
+  Future<void> updateTargetDateMultiple(List<String> ids, DateTime? targetDate) async {
+    for (final id in ids) {
+      final script = getById(id);
+      if (script != null) {
+        script.targetDate = targetDate;
+        if (targetDate != null) {
+          script.generatedSchedule = ScheduleGenerator.generate(
+            startDate: DateTime.now(),
+            targetDate: targetDate,
+          );
+          if (script.generatedSchedule.isNotEmpty) {
+            script.nextReviewAt = script.generatedSchedule[0];
+            script.scheduleIndex = 0;
+          }
+        } else {
+          script.generatedSchedule = [];
+          script.nextReviewAt = null;
+          script.scheduleIndex = 0;
+        }
+        await script.save();
+      }
+    }
   }
 
   List<String> getAllTags() {
@@ -123,6 +201,12 @@ final scriptsListProvider = StateNotifierProvider<ScriptsListNotifier, List<Scri
 // タグフィルタ用プロバイダ
 final selectedTagsProvider = StateProvider<Set<String>>((ref) => {});
 
+// 並び替えモード: 'lastPracticed' | 'sortOrder' | 'level'
+final sortModeProvider = StateProvider<String>((ref) => 'lastPracticed');
+
+// レベルフィルタ用プロバイダ（null = すべて）
+final levelFilterProvider = StateProvider<int?>((ref) => null);
+
 class ScriptsListNotifier extends StateNotifier<List<Script>> {
   final ScriptsRepository _repository;
 
@@ -140,6 +224,8 @@ class ScriptsListNotifier extends StateNotifier<List<Script>> {
     required List<String> tags,
     String parenthesesMode = 'stripContent',
     DateTime? targetDate,
+    int sortOrder = 0,
+    List<String>? pinnedClozeWords,
   }) async {
     final script = await _repository.add(
       title: title,
@@ -147,6 +233,8 @@ class ScriptsListNotifier extends StateNotifier<List<Script>> {
       tags: tags,
       parenthesesMode: parenthesesMode,
       targetDate: targetDate,
+      sortOrder: sortOrder,
+      pinnedClozeWords: pinnedClozeWords,
     );
     refresh();
     return script;
@@ -159,6 +247,21 @@ class ScriptsListNotifier extends StateNotifier<List<Script>> {
 
   Future<void> deleteScript(Script script) async {
     await _repository.delete(script);
+    refresh();
+  }
+
+  Future<void> deleteAllScripts() async {
+    await _repository.deleteAll();
+    refresh();
+  }
+
+  Future<void> deleteMultipleScripts(List<String> ids) async {
+    await _repository.deleteMultiple(ids);
+    refresh();
+  }
+
+  Future<void> updateTargetDateMultiple(List<String> ids, DateTime? targetDate) async {
+    await _repository.updateTargetDateMultiple(ids, targetDate);
     refresh();
   }
 }

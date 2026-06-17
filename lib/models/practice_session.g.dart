@@ -24,7 +24,7 @@ class PracticeSessionAdapter extends TypeAdapter<PracticeSession> {
       score: fields[4] as double,
       durationSeconds: fields[5] as int,
       recognizedText: fields[6] as String?,
-      createdAt: fields[7] as DateTime,
+      createdAt: fields[7] as DateTime?,
     );
   }
 

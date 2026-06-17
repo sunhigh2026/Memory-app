@@ -81,10 +81,19 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
     _script = scripts.firstWhere((s) => s.id == widget.scriptId);
 
     final density = ClozeGenerator.densityForLevel(widget.level);
-    _clozeWords = _generator.generate(_script.content, densityPercent: density);
+    final pinned = _script.pinnedClozeWords;
+    _clozeWords = _generator.generate(
+      _script.content,
+      densityPercent: density,
+      pinnedClozeWords: pinned,
+    );
 
     if (_clozeWords.isEmpty) {
-      _clozeWords = _generator.generate(_script.content, densityPercent: 30);
+      _clozeWords = _generator.generate(
+        _script.content,
+        densityPercent: 30,
+        pinnedClozeWords: pinned,
+      );
     }
 
     if (_clozeWords.isNotEmpty && widget.level == 1) {
@@ -420,57 +429,92 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
 
     return Column(
       children: [
-        TextField(
-          controller: _inputController,
-          focusNode: _inputFocusNode,
-          enabled: !_showingResult,
-          autofocus: true,
-          style: TextStyle(
-            color: textColor,
-            fontWeight: _showingResult ? FontWeight.bold : FontWeight.normal,
-          ),
-          decoration: InputDecoration(
-            fillColor: fillColor ?? Colors.white,
-            hintText: _isListeningVoiceInput ? '音声を聞き取り中...' : '答えを入力してください',
-            prefixIcon: IconButton(
-              icon: Icon(
-                _isListeningVoiceInput ? Icons.mic : Icons.mic_none,
-                color: _isListeningVoiceInput ? AppTheme.error : AppTheme.primary,
+        Row(
+          children: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _showingResult
+                  ? null
+                  : () {
+                      if (_isListeningVoiceInput) {
+                        _stopVoiceInput();
+                      } else {
+                        _startVoiceInput(target.word);
+                      }
+                    },
+              child: Container(
+                width: 48,
+                height: 48,
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: _isListeningVoiceInput
+                      ? AppTheme.error.withValues(alpha: 0.1)
+                      : Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: _isListeningVoiceInput
+                        ? AppTheme.error
+                        : AppTheme.grey300,
+                    width: _isListeningVoiceInput ? 2 : 1,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x0A000000),
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  _isListeningVoiceInput ? Icons.mic : Icons.mic_none,
+                  color: _isListeningVoiceInput ? AppTheme.error : AppTheme.primary,
+                ),
               ),
-              onPressed: _showingResult
-                  ? null
-                  : () => _isListeningVoiceInput 
-                      ? _stopVoiceInput() 
-                      : _startVoiceInput(target.word),
             ),
-            suffixIcon: IconButton(
-              icon: const Icon(Icons.send),
-              onPressed: _showingResult
-                  ? null
-                  : () => _checkAnswer(_inputController.text.trim(), target.word),
+            Expanded(
+              child: TextField(
+                controller: _inputController,
+                focusNode: _inputFocusNode,
+                enabled: !_showingResult,
+                autofocus: true,
+                style: TextStyle(
+                  color: textColor,
+                  fontWeight: _showingResult ? FontWeight.bold : FontWeight.normal,
+                ),
+                decoration: InputDecoration(
+                  fillColor: fillColor ?? Colors.white,
+                  hintText: _isListeningVoiceInput ? '音声を聞き取り中...' : '答えを入力してください',
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.send),
+                    onPressed: _showingResult
+                        ? null
+                        : () => _checkAnswer(_inputController.text.trim(), target.word),
+                  ),
+                  enabledBorder: borderColor != null
+                      ? OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: borderColor, width: 2),
+                        )
+                      : null,
+                  disabledBorder: borderColor != null
+                      ? OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: borderColor, width: 2),
+                        )
+                      : null,
+                  focusedBorder: borderColor != null
+                      ? OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: borderColor, width: 2),
+                        )
+                      : null,
+                ),
+                onSubmitted: _showingResult
+                    ? null
+                    : (value) => _checkAnswer(value.trim(), target.word),
+              ),
             ),
-            enabledBorder: borderColor != null
-                ? OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: borderColor, width: 2),
-                  )
-                : null,
-            disabledBorder: borderColor != null
-                ? OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: borderColor, width: 2),
-                  )
-                : null,
-            focusedBorder: borderColor != null
-                ? OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: borderColor, width: 2),
-                  )
-                : null,
-          ),
-          onSubmitted: _showingResult
-              ? null
-              : (value) => _checkAnswer(value.trim(), target.word),
+          ],
         ),
       ],
     );
@@ -514,17 +558,34 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
         });
         _checkAnswer(text, correctWord);
       },
-      onPartialResult: (text) {
+      onPartialResult: (text) async {
         if (!mounted) return;
         setState(() {
           _inputController.text = text;
         });
-        // リアルタイムで正解が含まれていれば即座に判定して次へ
-        final normalizedText = TextNormalizer.katakanaToHiragana(text);
-        final normalizedCorrect = TextNormalizer.katakanaToHiragana(correctWord);
+
+        final normalizedText = TextNormalizer.normalize(text);
+        final normalizedCorrect = TextNormalizer.normalize(correctWord);
+
+        // 1. 完全一致・包含チェック (高速)
         if (normalizedText.contains(normalizedCorrect)) {
           _stopVoiceInput();
           _checkAnswer(correctWord, correctWord); // 正解として送信
+          return;
+        }
+
+        // 2. ひらがな（読み）の包含および曖昧一致チェック
+        try {
+          final hiraText = await TextNormalizer.toHiragana(normalizedText);
+          final hiraCorrect = await TextNormalizer.toHiragana(normalizedCorrect);
+          if (hiraText.isNotEmpty && hiraCorrect.isNotEmpty) {
+            if (hiraText.contains(hiraCorrect) || TextNormalizer.isFuzzyMatch(hiraText, hiraCorrect)) {
+              _stopVoiceInput();
+              _checkAnswer(correctWord, correctWord); // 正解として送信
+            }
+          }
+        } catch (e) {
+          debugPrint('リアルタイムひらがな判定エラー: $e');
         }
       },
       onError: (error) {
@@ -600,15 +661,27 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
     );
   }
 
-  void _checkAnswer(String answer, String correct) {
+  void _checkAnswer(String answer, String correct) async {
     if (answer.isEmpty) return;
     if (_showingResult) return;
 
-    final normalizedAnswer = TextNormalizer.katakanaToHiragana(answer);
-    final normalizedCorrect = TextNormalizer.katakanaToHiragana(correct);
+    final normalizedAnswer = TextNormalizer.normalize(answer);
+    final normalizedCorrect = TextNormalizer.normalize(correct);
 
-    final isCorrect =
+    bool isCorrect =
         normalizedAnswer == normalizedCorrect || answer == correct;
+
+    if (!isCorrect) {
+      // ひらがな読み曖昧比較
+      try {
+        final hiraAnswer = await TextNormalizer.toHiragana(normalizedAnswer);
+        final hiraCorrect = await TextNormalizer.toHiragana(normalizedCorrect);
+        if (hiraAnswer.isNotEmpty && hiraCorrect.isNotEmpty) {
+          isCorrect = hiraAnswer == hiraCorrect ||
+              TextNormalizer.isFuzzyMatch(hiraAnswer, hiraCorrect);
+        }
+      } catch (_) {}
+    }
 
     if (widget.level == 1) {
       _selectedChoice = answer;
@@ -652,7 +725,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
             if (widget.level > 1) {
               Future.microtask(() {
                 if (mounted) _inputFocusNode.requestFocus();
-              });
+               });
             }
           }
         });

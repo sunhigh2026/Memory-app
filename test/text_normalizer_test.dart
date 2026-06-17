@@ -1,0 +1,78 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:memorization_app/core/utils/text_normalizer.dart';
+
+void main() {
+  group('TextNormalizer.levenshtein', () {
+    test('同じ文字列の距離は0', () {
+      expect(TextNormalizer.levenshtein('あいうえお', 'あいうえお'), 0);
+    });
+
+    test('1文字置換の距離は1', () {
+      expect(TextNormalizer.levenshtein('ひようせいしさん', 'ひようせつしさん'), 1);
+    });
+
+    test('1文字挿入の距離は1', () {
+      expect(TextNormalizer.levenshtein('あいうえ', 'あいうえお'), 1);
+    });
+
+    test('1文字削除の距離は1', () {
+      expect(TextNormalizer.levenshtein('あいうえお', 'あいうえ'), 1);
+    });
+
+    test('全く異なる文字列の距離はそれぞれの長さ', () {
+      expect(TextNormalizer.levenshtein('あか', 'あお'), 1); // 1文字置換
+      expect(TextNormalizer.levenshtein('', 'あいうえお'), 5);
+    });
+  });
+
+  group('TextNormalizer.maxAllowedDistance', () {
+    test('3文字以下は0（完全一致のみ）', () {
+      expect(TextNormalizer.maxAllowedDistance(1), 0);
+      expect(TextNormalizer.maxAllowedDistance(2), 0);
+      expect(TextNormalizer.maxAllowedDistance(3), 0);
+    });
+
+    test('4〜6文字は1', () {
+      expect(TextNormalizer.maxAllowedDistance(4), 1);
+      expect(TextNormalizer.maxAllowedDistance(5), 1);
+      expect(TextNormalizer.maxAllowedDistance(6), 1);
+    });
+
+    test('7文字以上は20%（ただし最低1）', () {
+      expect(TextNormalizer.maxAllowedDistance(7), 1); // 7 * 0.20 = 1.4 -> 1
+      expect(TextNormalizer.maxAllowedDistance(8), 1); // 8 * 0.20 = 1.6 -> 1
+      expect(TextNormalizer.maxAllowedDistance(9), 1); // 9 * 0.20 = 1.8 -> 1
+      expect(TextNormalizer.maxAllowedDistance(10), 2); // 10 * 0.20 = 2 -> 2
+      expect(TextNormalizer.maxAllowedDistance(15), 3); // 15 * 0.20 = 3 -> 3
+    });
+  });
+
+  group('TextNormalizer.isFuzzyMatch', () {
+    test('ひようせいしさん vs ひようせつしさん (8文字, 1字違い) はマッチする', () {
+      expect(TextNormalizer.isFuzzyMatch('ひようせつしさん', 'ひようせいしさん'), true);
+    });
+
+    test('あか vs あお (2文字, 1字違い) はマッチしない', () {
+      expect(TextNormalizer.isFuzzyMatch('あか', 'あお'), false);
+    });
+
+    test('にほんご vs にほん (4文字, 1字削除) はマッチする', () {
+      expect(TextNormalizer.isFuzzyMatch('にほん', 'にほんご'), true);
+    });
+
+    test('にほんご vs しほんご (4文字, 1字置換) はマッチする', () {
+      expect(TextNormalizer.isFuzzyMatch('しほんご', 'にほんご'), true);
+    });
+
+    test('にほんご vs しほん (4文字, 2字違い) はマッチしない', () {
+      expect(TextNormalizer.isFuzzyMatch('しほん', 'にほんご'), false);
+    });
+  });
+
+  group('TextNormalizer.normalize (丸数字・記号除去のテスト)', () {
+    test('丸数字や中黒、ダッシュが除去されること', () {
+      expect(TextNormalizer.normalize('①費用・便益'), '費用便益');
+      expect(TextNormalizer.normalize('①あ・い-う―え'), 'あいうえ');
+    });
+  });
+}
