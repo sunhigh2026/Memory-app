@@ -311,6 +311,15 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showLevelSelectionSheet(context),
+                      icon: const Icon(Icons.swap_vert, size: 18),
+                      label: const Text('レベルを変更して再チャレンジ'),
+                    ),
+                  ),
                   if (nextScript != null && passed) ...[
                     const SizedBox(height: 12),
                     SizedBox(
@@ -354,6 +363,91 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
     ),
   );
 }
+
+  void _showLevelSelectionSheet(BuildContext context) {
+    final scriptId = widget.scriptId;
+    final currentLevel = widget.level;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'レベルを選択して再チャレンジ',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            for (int lvl = 1; lvl <= 3; lvl++) ...[
+              _buildLevelOption(ctx, lvl, scriptId, currentLevel),
+              if (lvl < 3) const SizedBox(height: 8),
+            ],
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('キャンセル'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLevelOption(BuildContext sheetContext, int level, String scriptId, int currentLevel) {
+    final labels = {
+      1: 'Level 1: 4択',
+      2: 'Level 2: キーボード入力',
+      3: 'Level 3: 高難度',
+    };
+    final isCurrent = level == currentLevel;
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isCurrent ? AppTheme.primary : AppTheme.grey200,
+          width: isCurrent ? 2 : 1,
+        ),
+      ),
+      child: ListTile(
+        onTap: () {
+          Navigator.of(sheetContext).pop();
+          context.pushReplacement('/practice/$scriptId/$level');
+        },
+        title: Row(
+          children: [
+            Text(labels[level]!,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            if (isCurrent) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.grey200,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  '今回',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ],
+        ),
+        trailing: const Icon(Icons.chevron_right, size: 20),
+      ),
+    );
+  }
 }
 
 class _ResultStat extends StatelessWidget {
