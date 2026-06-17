@@ -368,7 +368,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: Row(
                     children: [
                       // 左側：並び替えドロップダウン
-                      Expanded(
+                      SizedBox(
+                        width: 120,
                         child: DropdownButtonFormField<String>(
                           value: sortMode,
                           decoration: const InputDecoration(
@@ -388,23 +389,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           },
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      // 右側：レベル選択ドロップダウン
+                      const SizedBox(width: 12),
+                      // 右側：レベル選択ボタン（ChoiceChips）
                       Expanded(
-                        child: DropdownButtonFormField<int?>(
-                          value: selectedLevel,
-                          decoration: const InputDecoration(
-                            labelText: 'レベル選択',
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        child: SizedBox(
+                          height: 40,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: 9, // 「すべて」 + 0〜7
+                            itemBuilder: (context, index) {
+                              final level = index == 0 ? null : index - 1;
+                              final label = level == null ? 'すべて' : 'Lv$level';
+                              final isSelected = selectedLevel == level;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: ChoiceChip(
+                                  label: Text(
+                                    label,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isSelected ? Colors.white : AppTheme.grey600,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                  selected: isSelected,
+                                  selectedColor: AppTheme.primary,
+                                  backgroundColor: AppTheme.grey200,
+                                  checkmarkColor: Colors.white,
+                                  onSelected: (selected) {
+                                    if (selected) {
+                                      ref.read(levelFilterProvider.notifier).state = level;
+                                    }
+                                  },
+                                ),
+                              );
+                            },
                           ),
-                          items: [
-                            const DropdownMenuItem(value: null, child: Text('すべて')),
-                            ...List.generate(8, (i) => DropdownMenuItem(value: i, child: Text('Lv$i'))),
-                          ],
-                          onChanged: (val) {
-                            ref.read(levelFilterProvider.notifier).state = val;
-                          },
                         ),
                       ),
                     ],
