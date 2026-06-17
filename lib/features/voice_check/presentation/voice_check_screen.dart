@@ -679,8 +679,22 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Section 5-F: カウントアップアニメーション
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: AppTheme.cardDecoration,
+              child: Text(
+                'No. ${_script.sortOrder} ${_script.title}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textDark,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
             const SizedBox(height: 16),
+            // Section 5-F: カウントアップアニメーション
             AnimatedBuilder(
               animation: _scoreAnim,
               builder: (context, child) {
@@ -796,7 +810,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
                         backgroundColor: AppTheme.secondary,
                         foregroundColor: Colors.white,
                       ),
-                      child: const Text('次の問題へ'),
+                      child: Text('次の問題へ (No. ${_nextScript!.sortOrder})'),
                     ),
                   ),
                 ],

@@ -219,6 +219,18 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
                 ),
                 child: Column(
                   children: [
+                    if (script != null) ...[
+                      Text(
+                        'No. ${script.sortOrder} ${script.title}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textDark,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
@@ -333,7 +345,7 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
                           backgroundColor: AppTheme.secondary,
                           foregroundColor: Colors.white,
                         ),
-                        child: const Text('次の問題へ'),
+                        child: Text('次の問題へ (No. ${nextScript.sortOrder})'),
                       ),
                     ),
                   ],
