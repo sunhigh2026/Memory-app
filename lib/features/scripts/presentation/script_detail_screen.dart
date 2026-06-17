@@ -188,6 +188,9 @@ class ScriptDetailScreen extends ConsumerWidget {
             // 本番日・復習ペース
             const SizedBox(height: 24),
             _TargetDateSection(script: script),
+            // 重要（穴埋め固定）
+            const SizedBox(height: 24),
+            _PinnedClozeWordsSection(script: script),
             // 許容語リスト
             const SizedBox(height: 24),
             _AllowedPairsSection(scriptId: scriptId),
@@ -886,6 +889,137 @@ class _InfoChip extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PinnedClozeWordsSection extends ConsumerStatefulWidget {
+  final Script script;
+
+  const _PinnedClozeWordsSection({required this.script});
+
+  @override
+  ConsumerState<_PinnedClozeWordsSection> createState() =>
+      _PinnedClozeWordsSectionState();
+}
+
+class _PinnedClozeWordsSectionState
+    extends ConsumerState<_PinnedClozeWordsSection> {
+  final _wordController = TextEditingController();
+
+  @override
+  void dispose() {
+    _wordController.dispose();
+    super.dispose();
+  }
+
+  void _addWord() {
+    final word = _wordController.text.trim();
+    if (word.isEmpty) return;
+    
+    // 本文に含まれているか確認
+    if (!widget.script.content.contains(word)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('「$word」は本文中に見つかりません')),
+      );
+      return;
+    }
+    
+    // 重複チェック
+    if (widget.script.pinnedClozeWords.contains(word)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('「$word」は既に登録されています')),
+      );
+      return;
+    }
+    
+    setState(() {
+      widget.script.pinnedClozeWords.add(word);
+      _wordController.clear();
+    });
+    widget.script.save();
+    ref.read(scriptsListProvider.notifier).refresh();
+  }
+
+  void _removeWord(String word) {
+    setState(() {
+      widget.script.pinnedClozeWords.remove(word);
+    });
+    widget.script.save();
+    ref.read(scriptsListProvider.notifier).refresh();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pinnedWords = widget.script.pinnedClozeWords;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: '重要（穴埋め固定）'),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: AppTheme.outlineDecoration,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (pinnedWords.isEmpty)
+                Text(
+                  '登録されている重要語はありません（本文中のテキストを長押し選択して追加できます）',
+                  style: TextStyle(fontSize: 13, color: AppTheme.grey500),
+                )
+              else
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: pinnedWords.map((word) {
+                    return InputChip(
+                      label: Text(
+                        word,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      deleteIcon: const Icon(Icons.close, size: 16),
+                      deleteIconColor: AppTheme.grey400,
+                      onDeleted: () => _removeWord(word),
+                      backgroundColor: AppTheme.primary.withValues(alpha: 0.08),
+                      side: BorderSide.none,
+                    );
+                  }).toList(),
+                ),
+              const SizedBox(height: 12),
+              // 手動追加用フィールド
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _wordController,
+                      decoration: const InputDecoration(
+                        hintText: '本文中の単語を入力',
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                      ),
+                      onSubmitted: (_) => _addWord(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: _addWord,
+                    icon: const Icon(Icons.add_circle_outline),
+                    color: AppTheme.primary,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
