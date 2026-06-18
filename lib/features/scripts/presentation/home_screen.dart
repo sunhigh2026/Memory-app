@@ -20,6 +20,9 @@ Color levelColor(int level) {
     case 3:
       return AppTheme.secondary;
     case 4:
+    case 5:
+    case 6:
+    case 7:
       return AppTheme.levelGold;
     default:
       return AppTheme.primary;
@@ -961,7 +964,7 @@ class _ScriptCard extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    script.currentLevel == 4
+                    script.currentLevel >= 4
                         ? 'ベストスコア: ${script.bestVoiceScore.toStringAsFixed(0)}%'
                         : script.lastPracticedAt == null
                             ? '未学習'
