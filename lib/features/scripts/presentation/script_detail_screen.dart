@@ -34,13 +34,7 @@ class ScriptDetailScreen extends ConsumerWidget {
         title: Text('No. ${script.sortOrder} ${script.title}'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/');
-            }
-          },
+          onPressed: () => context.go('/'),
         ),
         actions: [
           IconButton(
