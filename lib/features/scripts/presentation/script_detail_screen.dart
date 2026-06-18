@@ -31,7 +31,7 @@ class ScriptDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(script.title),
+        title: Text('No. ${script.sortOrder} ${script.title}'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
