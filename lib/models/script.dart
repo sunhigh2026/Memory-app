@@ -118,13 +118,16 @@ class Script extends HiveObject {
       case 3:
         return 50 + correctRate * 0.25;
       case 4:
+      case 5:
+      case 6:
+      case 7:
         return 75 + (bestVoiceScore / 100) * 25;
       default:
         return 0;
     }
   }
 
-  bool get isMastered => currentLevel == 4 && bestVoiceScore >= 85;
+  bool get isMastered => currentLevel >= 4 && bestVoiceScore >= 85;
 
   bool get isReviewDue {
     if (nextReviewAt == null) return practiceCount > 0;
