@@ -202,7 +202,7 @@ final scriptsListProvider = StateNotifierProvider<ScriptsListNotifier, List<Scri
 final selectedTagsProvider = StateProvider<Set<String>>((ref) => {});
 
 // 並び替えモード: 'lastPracticed' | 'sortOrder' | 'level'
-final sortModeProvider = StateProvider<String>((ref) => 'lastPracticed');
+final sortModeProvider = StateProvider<String>((ref) => 'sortOrder');
 
 // レベルフィルタ用プロバイダ（null = すべて）
 final levelFilterProvider = StateProvider<int?>((ref) => null);
