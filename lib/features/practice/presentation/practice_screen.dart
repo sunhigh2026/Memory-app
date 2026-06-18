@@ -172,7 +172,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
               }
             },
           ),
-          title: Text('Level ${widget.level} 穴埋め練習'),
+          title: Text('No. ${_script.sortOrder} ${_script.title}'),
           actions: [
             Center(
               child: Padding(
@@ -717,12 +717,13 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
         // 軽量オーバーレイで正解を表示し、即座に次へ（キーボード維持）
         _showCorrectOverlay();
         _isAutoTransitioning = true;
+        final isLast = _currentIndex >= _clozeWords.length - 1;
         Future.delayed(const Duration(milliseconds: 250), () {
           _isAutoTransitioning = false;
           if (mounted) {
             _next();
-            // 次の問題でもキーボードを維持
-            if (widget.level > 1) {
+            // 次の問題がある場合のみキーボードを維持
+            if (!isLast && widget.level > 1) {
               Future.microtask(() {
                 if (mounted) _inputFocusNode.requestFocus();
                });
@@ -730,6 +731,8 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
           }
         });
       } else {
+        if (!mounted) return;
+        FocusScope.of(context).unfocus(); // 不正解時はキーボードを閉じる
         setState(() {
           _showingResult = true;
           _lastAnswerCorrect = false;
@@ -830,6 +833,9 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
       _stopwatch.stop();
       final duration = _stopwatch.elapsed.inSeconds;
 
+      // 結果画面遷移前にキーボードを非表示にする
+      FocusScope.of(context).unfocus();
+
       final mistakes = <String>[];
       for (int i = 0; i < _clozeWords.length; i++) {
         if (_answeredResults[i] == false) {
@@ -840,14 +846,20 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
       final score = _clozeWords.isEmpty
           ? 0.0
           : (_correctCount / _clozeWords.length) * 100;
-      context.pushReplacement('/practice-result', extra: {
-        'scriptId': widget.scriptId,
-        'score': score,
-        'level': widget.level,
-        'totalQuestions': _clozeWords.length,
-        'correctAnswers': _correctCount,
-        'durationSeconds': duration,
-        'mistakes': mistakes,
+
+      // キーボードの閉じるアニメーションがある程度進行するのを待ち、
+      // 画面レイアウトのオーバーフローを防ぐために少し遅延を入れてから遷移する
+      Future.delayed(const Duration(milliseconds: 150), () {
+        if (!mounted) return;
+        context.pushReplacement('/practice-result', extra: {
+          'scriptId': widget.scriptId,
+          'score': score,
+          'level': widget.level,
+          'totalQuestions': _clozeWords.length,
+          'correctAnswers': _correctCount,
+          'durationSeconds': duration,
+          'mistakes': mistakes,
+        });
       });
     }
   }

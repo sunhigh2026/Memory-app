@@ -170,205 +170,207 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
           title: const Text('練習結果'),
           automaticallyImplyLeading: false,
         ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // スコアアニメーション
-              AnimatedBuilder(
-                animation: _scoreAnimation,
-                builder: (context, child) {
-                  return Column(
-                    children: [
-                      Text(
-                        '${_scoreAnimation.value.toStringAsFixed(0)}%',
-                        style: TextStyle(
-                          fontSize: 64,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.scoreColor(widget.score),
-                        ),
-                      ),
-                      Text(
-                        AppTheme.scoreLabel(widget.score),
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.scoreColor(widget.score),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 32),
-              // 正答数
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  // Section 1-D: circular(16) → radiusLg
-                  borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    if (script != null) ...[
-                      Text(
-                        'No. ${script.sortOrder} ${script.title}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.textDark,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      body: SingleChildScrollView(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // スコアアニメーション
+                AnimatedBuilder(
+                  animation: _scoreAnimation,
+                  builder: (context, child) {
+                    return Column(
                       children: [
-                        _ResultStat(
-                          label: '正解',
-                          value: '${widget.correctAnswers}',
-                          color: AppTheme.secondary,
+                        Text(
+                          '${_scoreAnimation.value.toStringAsFixed(0)}%',
+                          style: TextStyle(
+                            fontSize: 64,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.scoreColor(widget.score),
+                          ),
                         ),
-                        _ResultStat(
-                          label: '問題数',
-                          value: '${widget.totalQuestions}',
-                          color: AppTheme.primary,
+                        Text(
+                          AppTheme.scoreLabel(widget.score),
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.scoreColor(widget.score),
+                          ),
                         ),
-                        _ResultStat(
-                          label: 'Level',
-                          value: '${widget.level}',
-                          color: AppTheme.accent,
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 32),
+                // 正答数
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    // Section 1-D: circular(16) → radiusLg
+                    borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      if (script != null) ...[
+                        Text(
+                          'No. ${script.sortOrder} ${script.title}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textDark,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _ResultStat(
+                            label: '正解',
+                            value: '${widget.correctAnswers}',
+                            color: AppTheme.secondary,
+                          ),
+                          _ResultStat(
+                            label: '問題数',
+                            value: '${widget.totalQuestions}',
+                            color: AppTheme.primary,
+                          ),
+                          _ResultStat(
+                            label: 'Level',
+                            value: '${widget.level}',
+                            color: AppTheme.accent,
+                          ),
+                        ],
+                      ),
+                      if (leveledUp) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.secondary.withValues(alpha: 0.1),
+                            borderRadius:
+                                BorderRadius.circular(AppTheme.radiusSm),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.arrow_upward,
+                                  color: AppTheme.secondary, size: 20),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Level ${widget.level + 1} に昇格！',
+                                style: const TextStyle(
+                                  color: AppTheme.secondary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      if (!passed) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          '80%以上で次のレベルに昇格できます',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.grey500,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+                // ボタン
+                Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () =>
+                                context.go('/detail/${widget.scriptId}'),
+                            child: const Text('詳細に戻る'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              final nextLevel = passed ? widget.level + 1 : widget.level;
+                              if (nextLevel >= 4) {
+                                context.pushReplacement(
+                                    '/voice-check/${widget.scriptId}/4');
+                              } else {
+                                context.pushReplacement(
+                                    '/practice/${widget.scriptId}/$nextLevel');
+                              }
+                            },
+                            child: Text(passed ? '次のレベルへ' : 'もう一度'),
+                          ),
                         ),
                       ],
                     ),
-                    if (leveledUp) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppTheme.secondary.withValues(alpha: 0.1),
-                          borderRadius:
-                              BorderRadius.circular(AppTheme.radiusSm),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.arrow_upward,
-                                color: AppTheme.secondary, size: 20),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Level ${widget.level + 1} に昇格！',
-                              style: const TextStyle(
-                                color: AppTheme.secondary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _showLevelSelectionSheet(context),
+                        icon: const Icon(Icons.swap_vert, size: 18),
+                        label: const Text('レベルを変更して再チャレンジ'),
+                      ),
+                    ),
+                    if (nextScript != null && passed) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            context.pushReplacement(
+                                '/practice/${nextScript.id}/${widget.level}');
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.secondary,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: Text('次の問題へ (No. ${nextScript.sortOrder})'),
                         ),
                       ),
                     ],
-                    if (!passed) ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        '80%以上で次のレベルに昇格できます',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppTheme.grey500,
+                    if (!passed && widget.level > 0) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            context.pushReplacement(
+                                '/practice/${widget.scriptId}/${widget.level - 1}');
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.grey600,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('レベルを下げて再チャレンジ'),
                         ),
                       ),
                     ],
                   ],
                 ),
-              ),
-              const SizedBox(height: 32),
-              // ボタン
-              Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () =>
-                              context.go('/detail/${widget.scriptId}'),
-                          child: const Text('詳細に戻る'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            final nextLevel = passed ? widget.level + 1 : widget.level;
-                            if (nextLevel >= 4) {
-                              context.pushReplacement(
-                                  '/voice-check/${widget.scriptId}/4');
-                            } else {
-                              context.pushReplacement(
-                                  '/practice/${widget.scriptId}/$nextLevel');
-                            }
-                          },
-                          child: Text(passed ? '次のレベルへ' : 'もう一度'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () => _showLevelSelectionSheet(context),
-                      icon: const Icon(Icons.swap_vert, size: 18),
-                      label: const Text('レベルを変更して再チャレンジ'),
-                    ),
-                  ),
-                  if (nextScript != null && passed) ...[
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          context.pushReplacement(
-                              '/practice/${nextScript.id}/${widget.level}');
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.secondary,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: Text('次の問題へ (No. ${nextScript.sortOrder})'),
-                      ),
-                    ),
-                  ],
-                  if (!passed && widget.level > 0) ...[
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          context.pushReplacement(
-                              '/practice/${widget.scriptId}/${widget.level - 1}');
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.grey600,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text('レベルを下げて再チャレンジ'),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

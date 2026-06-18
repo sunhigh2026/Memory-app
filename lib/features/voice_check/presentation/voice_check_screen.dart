@@ -186,7 +186,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
               }
             },
           ),
-          title: const Text('音声暗記確認'),
+          title: Text('No. ${_script.sortOrder} ${_script.title}'),
         ),
       body: SingleChildScrollView(
         child: Padding(
