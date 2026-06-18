@@ -319,7 +319,7 @@ class SettingsScreen extends ConsumerWidget {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.help_outline, color: AppTheme.primary),
-                  title: const Text('使い方と仕組み', style: TextStyle(fontSize: 15)),
+                  title: const Text('使い方ガイド', style: TextStyle(fontSize: 15)),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => context.push('/settings/how-to-use'),
                 ),

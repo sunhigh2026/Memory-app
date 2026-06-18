@@ -13,7 +13,7 @@ class HowToUseScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('使い方と仕組み'),
+        title: const Text('使い方ガイド'),
       ),
       body: FutureBuilder<String>(
         future: _loadUsageText(),
