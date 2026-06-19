@@ -132,8 +132,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final goalMode = ref.watch(goalSettingModeProvider);
     final manualGoal = ref.watch(dailyGoalProvider);
+    final selectedLevels = ref.watch(levelFilterProvider);
+    final selectedRanks = ref.watch(rankFilterProvider);
     final sortMode = ref.watch(sortModeProvider);
-    final selectedLevel = ref.watch(levelFilterProvider);
 
     // タグフィルタ適用
     var filtered = selectedTags.isEmpty
@@ -143,8 +144,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             .toList();
 
     // レベルフィルタ適用
-    if (selectedLevel != null) {
-      filtered = filtered.where((s) => s.currentLevel == selectedLevel).toList();
+    if (selectedLevels.isNotEmpty) {
+      filtered = filtered.where((s) => selectedLevels.contains(s.currentLevel)).toList();
+    }
+
+    // ランクフィルタ適用
+    if (selectedRanks.isNotEmpty) {
+      filtered = filtered.where((s) => selectedRanks.contains(s.rank)).toList();
     }
 
     // 並び替えモードに応じてソート
@@ -364,15 +370,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   ),
                 ),
-              // ソートとレベルフィルタ (タグの下にインライン配置)
+              // ソートとレベル・ランクフィルタ (タグの下にインライン配置)
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   child: Row(
                     children: [
                       // 左側：並び替えドロップダウン
-                      SizedBox(
-                        width: 120,
+                      Expanded(
+                        flex: 3,
                         child: DropdownButtonFormField<String>(
                           value: sortMode,
                           decoration: const InputDecoration(
@@ -392,42 +398,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           },
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      // 右側：レベル選択ボタン（ChoiceChips）
+                      const SizedBox(width: 8),
+                      // レベル複数選択ドロップダウン
                       Expanded(
-                        child: SizedBox(
-                          height: 40,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: 9, // 「すべて」 + 0〜7
-                            itemBuilder: (context, index) {
-                              final level = index == 0 ? null : index - 1;
-                              final label = level == null ? 'すべて' : 'Lv$level';
-                              final isSelected = selectedLevel == level;
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 6),
-                                child: ChoiceChip(
-                                  label: Text(
-                                    label,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: isSelected ? Colors.white : AppTheme.grey600,
-                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                    ),
-                                  ),
-                                  selected: isSelected,
-                                  selectedColor: AppTheme.primary,
-                                  backgroundColor: AppTheme.grey200,
-                                  checkmarkColor: Colors.white,
-                                  onSelected: (selected) {
-                                    if (selected) {
-                                      ref.read(levelFilterProvider.notifier).state = level;
-                                    }
-                                  },
-                                ),
-                              );
-                            },
-                          ),
+                        flex: 4,
+                        child: _MultiSelectDropdown<int>(
+                          label: 'レベル',
+                          values: selectedLevels,
+                          items: const [0, 1, 2, 3, 4, 5, 6, 7],
+                          itemLabelBuilder: (val) => 'Lv$val',
+                          onChanged: (newValues) {
+                            ref.read(levelFilterProvider.notifier).state = newValues;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // ランク複数選択ドロップダウン
+                      Expanded(
+                        flex: 3,
+                        child: _MultiSelectDropdown<String>(
+                          label: 'ランク',
+                          values: selectedRanks,
+                          items: const ['S', 'A', 'B', 'C'],
+                          itemLabelBuilder: (val) => val,
+                          onChanged: (newValues) {
+                            ref.read(rankFilterProvider.notifier).state = newValues;
+                          },
                         ),
                       ),
                     ],
@@ -490,7 +486,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         Icon(Icons.library_books, size: 64, color: AppTheme.grey300),
                         const SizedBox(height: 16),
                         Text(
-                          selectedTags.isNotEmpty || selectedLevel != null
+                          selectedTags.isNotEmpty ||
+                                  selectedLevels.isNotEmpty ||
+                                  selectedRanks.isNotEmpty
                               ? '該当するテキストがありません'
                               : 'テキストを追加して\n暗記を始めましょう',
                           textAlign: TextAlign.center,
@@ -894,6 +892,29 @@ class _ScriptCard extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  if (script.rank.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                        border: Border.all(
+                          color: AppTheme.primary.withValues(alpha: 0.2),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        script.rank,
+                        style: const TextStyle(
+                          color: AppTheme.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 4),
@@ -998,5 +1019,145 @@ class _ScriptCard extends ConsumerWidget {
     if (diff.inHours < 24) return '${diff.inHours}時間前';
     if (diff.inDays < 7) return '${diff.inDays}日前';
     return '${(diff.inDays / 7).floor()}週間前';
+  }
+}
+
+class _MultiSelectDropdown<T> extends StatefulWidget {
+  final String label;
+  final Set<T> values;
+  final List<T> items;
+  final String Function(T) itemLabelBuilder;
+  final ValueChanged<Set<T>> onChanged;
+
+  const _MultiSelectDropdown({
+    required this.label,
+    required this.values,
+    required this.items,
+    required this.itemLabelBuilder,
+    required this.onChanged,
+  });
+
+  @override
+  State<_MultiSelectDropdown<T>> createState() => _MultiSelectDropdownState<T>();
+}
+
+class _MultiSelectDropdownState<T> extends State<_MultiSelectDropdown<T>> {
+  final GlobalKey _buttonKey = GlobalKey();
+
+  void _showMenu(BuildContext context) async {
+    final RenderBox renderBox = _buttonKey.currentContext!.findRenderObject() as RenderBox;
+    final offset = renderBox.localToGlobal(Offset.zero);
+    final rect = RelativeRect.fromLTRB(
+      offset.dx,
+      offset.dy + renderBox.size.height,
+      offset.dx + renderBox.size.width,
+      offset.dy + renderBox.size.height + 200,
+    );
+
+    // 一時的に選択状態をコピー
+    final tempSelected = Set<T>.from(widget.values);
+
+    await showMenu<T>(
+      context: context,
+      position: rect,
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppTheme.grey200),
+      ),
+      items: [
+        PopupMenuItem<T>(
+          enabled: false, // タップでメニューが閉じるのを防ぐ
+          child: StatefulBuilder(
+            builder: (context, menuSetState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 「すべて」クリアボタン
+                  TextButton(
+                    onPressed: tempSelected.isEmpty
+                        ? null
+                        : () {
+                            menuSetState(() {
+                              tempSelected.clear();
+                            });
+                            widget.onChanged(tempSelected);
+                          },
+                    child: const Text('クリア', style: TextStyle(fontSize: 12)),
+                  ),
+                  const Divider(height: 1),
+                  ...widget.items.map((item) {
+                    final isChecked = tempSelected.contains(item);
+                    return CheckboxListTile(
+                      title: Text(
+                        widget.itemLabelBuilder(item),
+                        style: const TextStyle(fontSize: 14, color: AppTheme.textDark),
+                      ),
+                      value: isChecked,
+                      onChanged: (checked) {
+                        menuSetState(() {
+                          if (checked == true) {
+                            tempSelected.add(item);
+                          } else {
+                            tempSelected.remove(item);
+                          }
+                        });
+                        widget.onChanged(tempSelected);
+                      },
+                      controlAffinity: ListTileControlAffinity.leading,
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                    );
+                  }),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final displayText = widget.values.isEmpty
+        ? 'すべて'
+        : widget.values.map(widget.itemLabelBuilder).join(', ');
+
+    return InkWell(
+      key: _buttonKey,
+      onTap: () => _showMenu(context),
+      borderRadius: BorderRadius.circular(12),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: widget.label,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppTheme.grey300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppTheme.primary, width: 2),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                displayText,
+                style: const TextStyle(fontSize: 13, color: AppTheme.textDark),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ),
+            const Icon(Icons.arrow_drop_down, size: 18, color: AppTheme.grey600),
+          ],
+        ),
+      ),
+    );
   }
 }

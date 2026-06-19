@@ -29,6 +29,7 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
   List<String> _tagSuggestions = [];
   List<String> _pinnedClozeWords = [];
   String _parenthesesMode = 'stripContent';
+  String _rank = 'B';
   bool _isEditing = false;
 
   static const int maxContentLength = 5000;
@@ -75,6 +76,7 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
       _tags = List<String>.from(script.tags);
       _parenthesesMode = script.parenthesesMode;
       _pinnedClozeWords = List<String>.from(script.pinnedClozeWords);
+      _rank = script.rank;
     });
   }
 
@@ -220,6 +222,30 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
                 ),
               ),
               keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 16),
+            // 出題ランク
+            DropdownButtonFormField<String>(
+              value: _rank,
+              decoration: const InputDecoration(
+                labelText: '出題ランク',
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'S', child: Text('S (頻度: 非常に入念)')),
+                DropdownMenuItem(value: 'A', child: Text('A (頻度: 高)')),
+                DropdownMenuItem(value: 'B', child: Text('B (頻度: 普通)')),
+                DropdownMenuItem(value: 'C', child: Text('C (頻度: 低)')),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => _rank = value);
+                }
+              },
             ),
             const SizedBox(height: 16),
             // ピン留め重要語（pinnedClozeWords）入力欄
@@ -476,6 +502,7 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
       script.parenthesesMode = _parenthesesMode;
       script.sortOrder = sortOrder;
       script.pinnedClozeWords = _pinnedClozeWords;
+      script.rank = _rank;
       await notifier.updateScript(script);
     } else {
       await notifier.addScript(
@@ -485,6 +512,7 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
         parenthesesMode: _parenthesesMode,
         sortOrder: sortOrder,
         pinnedClozeWords: _pinnedClozeWords,
+        rank: _rank,
       );
     }
 

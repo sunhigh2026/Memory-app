@@ -42,13 +42,14 @@ class ScriptAdapter extends TypeAdapter<Script> {
       pinnedClozeWords:
           fields[22] == null ? [] : (fields[22] as List?)?.cast<String>(),
       sortOrder: fields[23] == null ? 0 : fields[23] as int,
+      rank: fields[24] == null ? 'B' : fields[24] as String,
     );
   }
 
   @override
   void write(BinaryWriter writer, Script obj) {
     writer
-      ..writeByte(24)
+      ..writeByte(25)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -96,7 +97,9 @@ class ScriptAdapter extends TypeAdapter<Script> {
       ..writeByte(22)
       ..write(obj.pinnedClozeWords)
       ..writeByte(23)
-      ..write(obj.sortOrder);
+      ..write(obj.sortOrder)
+      ..writeByte(24)
+      ..write(obj.rank);
   }
 
   @override

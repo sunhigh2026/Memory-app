@@ -61,6 +61,10 @@ class ScriptDetailScreen extends ConsumerWidget {
                   icon: Icons.repeat,
                   label: '${script.practiceCount}回練習',
                 ),
+                _InfoChip(
+                  icon: Icons.star_border,
+                  label: 'ランク: ${script.rank}',
+                ),
                 ...script.tags.map((tag) => _InfoChip(
                       icon: Icons.label_outline,
                       label: tag,
@@ -495,6 +499,32 @@ class _TargetDateSectionState extends ConsumerState<_TargetDateSection> {
                     style: TextStyle(fontSize: 11, color: AppTheme.grey500),
                   ),
                 ),
+              const SizedBox(height: 16),
+              const Text(
+                '出題ランク（Aほど復習頻度が高くなります）',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'S', label: Text('S')),
+                  ButtonSegment(value: 'A', label: Text('A')),
+                  ButtonSegment(value: 'B', label: Text('B')),
+                  ButtonSegment(value: 'C', label: Text('C')),
+                ],
+                selected: {script.rank},
+                onSelectionChanged: (newSelection) async {
+                  script.rank = newSelection.first;
+                  await script.save();
+                  ref.read(scriptsListProvider.notifier).refresh();
+                },
+                style: ButtonStyle(
+                  textStyle: WidgetStatePropertyAll(
+                    const TextStyle(fontSize: 11),
+                  ),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
             ],
           ),
         ),

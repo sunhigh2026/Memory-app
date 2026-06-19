@@ -28,13 +28,30 @@ class SpacedRepetition {
     }
   }
 
+  /// 出題ランク名 → 係数
+  static double getRankMultiplier(String rank) {
+    switch (rank) {
+      case 'S':
+        return 0.5; // 間隔が半分（頻度2倍）
+      case 'A':
+        return 0.75; // 間隔が0.75倍
+      case 'B':
+        return 1.0; // 基準
+      case 'C':
+        return 1.5; // 間隔が1.5倍（頻度下がる）
+      default:
+        return 1.0;
+    }
+  }
+
   /// SM-2 アルゴリズムで次回復習パラメータを算出
-  /// [pace] でペース係数を適用
+  /// [pace] でペース係数、[rank] で出題ランク係数を適用
   static SpacedRepetitionResult calculate({
     required double score,
     required double currentInterval,
     required double currentEaseFactor,
     String pace = 'normal',
+    String rank = 'B',
   }) {
     final quality = scoreToQuality(score);
 
@@ -58,9 +75,10 @@ class SpacedRepetition {
       } else {
         newInterval = currentInterval * newEaseFactor;
       }
-      // ペース係数を適用
+      // ペース係数とランク係数を適用
       final multiplier = getPaceMultiplier(pace);
-      newInterval = (newInterval * multiplier).ceilToDouble().clamp(1, 365);
+      final rankMultiplier = getRankMultiplier(rank);
+      newInterval = (newInterval * multiplier * rankMultiplier).ceilToDouble().clamp(1, 365);
     }
 
     final nextReviewAt = DateTime.now().add(

@@ -162,6 +162,7 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
         context.go('/detail/${widget.scriptId}');
       },
       child: Scaffold(
+        resizeToAvoidBottomInset: false,
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),

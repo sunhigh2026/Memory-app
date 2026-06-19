@@ -138,12 +138,13 @@ class ProgressRepository {
             script.generatedSchedule[script.scheduleIndex];
       }
     } else {
-      // SM-2 モード（ペース係数適用）
+      // SM-2 モード（ペース係数およびランク適用）
       final srResult = SpacedRepetition.calculate(
         score: score,
         currentInterval: script.intervalDays,
         currentEaseFactor: script.easeFactor,
         pace: script.reviewPace,
+        rank: script.rank,
       );
       script.intervalDays = srResult.intervalDays;
       script.easeFactor = srResult.easeFactor;

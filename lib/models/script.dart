@@ -77,6 +77,9 @@ class Script extends HiveObject {
   @HiveField(23, defaultValue: 0)
   late int sortOrder; // 通し番号（ソート用）
 
+  @HiveField(24, defaultValue: 'B')
+  late String rank; // 出題ランク ('特A', 'A', 'B', 'C')
+
   Script({
     required this.id,
     required this.title,
@@ -102,6 +105,7 @@ class Script extends HiveObject {
     Map<String, int>? mistakeWords,
     List<String>? pinnedClozeWords,
     this.sortOrder = 0,
+    this.rank = 'B',
   })  : createdAt = createdAt ?? DateTime.now(),
         clozeWords = clozeWords ?? [],
         tags = tags ?? [],

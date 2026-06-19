@@ -157,8 +157,8 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
         final shouldPop = await _showExitConfirmationDialog();
-        if (shouldPop && mounted) {
-          context.pop();
+        if (shouldPop && context.mounted) {
+          context.go('/detail/${widget.scriptId}');
         }
       },
       child: Scaffold(
@@ -167,8 +167,8 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
             icon: const Icon(Icons.arrow_back),
             onPressed: () async {
               final shouldPop = await _showExitConfirmationDialog();
-              if (shouldPop && mounted) {
-                context.pop();
+              if (shouldPop && context.mounted) {
+                context.go('/detail/${widget.scriptId}');
               }
             },
           ),
@@ -197,6 +197,43 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
               backgroundColor: AppTheme.grey200,
               valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary),
             ),
+            if (_script.tags.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: _script.tags.map((tag) {
+                      final colors = AppTheme.tagColor(tag);
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: colors.background,
+                          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.label_outline, size: 12, color: colors.text),
+                            const SizedBox(width: 4),
+                            Text(
+                              tag,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: colors.text,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ],
             // テキスト表示（穴あき）— Section 5-B: AnimatedSwitcher
             Expanded(
               child: SingleChildScrollView(
@@ -849,7 +886,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
 
       // キーボードの閉じるアニメーションがある程度進行するのを待ち、
       // 画面レイアウトのオーバーフローを防ぐために少し遅延を入れてから遷移する
-      Future.delayed(const Duration(milliseconds: 150), () {
+      Future.delayed(const Duration(milliseconds: 300), () {
         if (!mounted) return;
         context.pushReplacement('/practice-result', extra: {
           'scriptId': widget.scriptId,

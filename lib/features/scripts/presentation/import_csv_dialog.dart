@@ -17,8 +17,8 @@ class _ImportCsvDialogState extends ConsumerState<ImportCsvDialog> {
   bool _isImporting = false;
   bool _isImported = false;
   String _statusMessage = 'CSVファイルを選択してください。\n'
-      '（タイトル, 本文, タグ, 本番日, 通し番号）または\n'
-      '（通し番号, タイトル, 本文, タグ, 本番日）の形式に対応しています。';
+      '（タイトル, 本文, タグ, 本番日, 通し番号, ランク）または\n'
+      '（通し番号, タイトル, 本文, タグ, 本番日, ランク）の形式に対応しています。';
 
   Future<void> _importCsv() async {
     setState(() {
@@ -129,9 +129,10 @@ class _ImportCsvDialogState extends ConsumerState<ImportCsvDialog> {
         List<String> tags = [];
         DateTime? targetDate;
         int sortOrder = 0;
+        String rank = 'B';
 
         if (hasLeadingSortOrder) {
-          // 通し番号あり：[0]:通し番号, [1]:タイトル, [2]:本文, [3]:タグ, [4]:ターゲット日
+          // 通し番号あり：[0]:通し番号, [1]:タイトル, [2]:本文, [3]:タグ, [4]:ターゲット日, [5]:ランク
           if (row.length >= 3) {
             final sortStr = row[0].toString().trim();
             final cleanSortStr = sortStr.replaceAll(RegExp(r'\D'), '');
@@ -155,9 +156,24 @@ class _ImportCsvDialogState extends ConsumerState<ImportCsvDialog> {
                 targetDate = DateTime.tryParse(normalized);
               }
             }
+
+            if (row.length >= 6) {
+              final rankStr = row[5].toString().trim();
+              if (['特A', 'S', 'A', 'B', 'C'].contains(rankStr)) {
+                rank = rankStr == '特A' ? 'S' : rankStr;
+              } else if (rankStr.toUpperCase() == 'S') {
+                rank = 'S';
+              } else if (rankStr.toUpperCase() == 'A') {
+                rank = 'A';
+              } else if (rankStr.toUpperCase() == 'B') {
+                rank = 'B';
+              } else if (rankStr.toUpperCase() == 'C') {
+                rank = 'C';
+              }
+            }
           }
         } else {
-          // 通し番号なし（従来通り）：[0]:タイトル, [1]:本文, [2]:タグ, [3]:ターゲット日, [4]:通し番号
+          // 通し番号なし（従来通り）：[0]:タイトル, [1]:本文, [2]:タグ, [3]:ターゲット日, [4]:通し番号, [5]:ランク
           if (row.length >= 2) {
             title = row[0].toString().trim();
             content = row[1].toString().trim();
@@ -183,6 +199,21 @@ class _ImportCsvDialogState extends ConsumerState<ImportCsvDialog> {
               final cleanSortStr = sortStr.replaceAll(RegExp(r'\D'), '');
               sortOrder = int.tryParse(cleanSortStr) ?? 0;
             }
+
+            if (row.length >= 6) {
+              final rankStr = row[5].toString().trim();
+              if (['特A', 'S', 'A', 'B', 'C'].contains(rankStr)) {
+                rank = rankStr == '特A' ? 'S' : rankStr;
+              } else if (rankStr.toUpperCase() == 'S') {
+                rank = 'S';
+              } else if (rankStr.toUpperCase() == 'A') {
+                rank = 'A';
+              } else if (rankStr.toUpperCase() == 'B') {
+                rank = 'B';
+              } else if (rankStr.toUpperCase() == 'C') {
+                rank = 'C';
+              }
+            }
           }
         }
 
@@ -193,6 +224,7 @@ class _ImportCsvDialogState extends ConsumerState<ImportCsvDialog> {
             tags: tags,
             targetDate: targetDate,
             sortOrder: sortOrder,
+            rank: rank,
           );
           importedCount++;
         }

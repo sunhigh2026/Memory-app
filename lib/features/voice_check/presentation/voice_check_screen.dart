@@ -171,8 +171,8 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
         final shouldPop = await _showExitConfirmationDialog();
-        if (shouldPop && mounted) {
-          context.pop();
+        if (shouldPop && context.mounted) {
+          context.go('/detail/${widget.scriptId}');
         }
       },
       child: Scaffold(
@@ -181,8 +181,8 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
             icon: const Icon(Icons.arrow_back),
             onPressed: () async {
               final shouldPop = await _showExitConfirmationDialog();
-              if (shouldPop && mounted) {
-                context.pop();
+              if (shouldPop && context.mounted) {
+                context.go('/detail/${widget.scriptId}');
               }
             },
           ),
@@ -201,6 +201,38 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              if (_script.tags.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: _script.tags.map((tag) {
+                    final colors = AppTheme.tagColor(tag);
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: colors.background,
+                        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.label_outline, size: 12, color: colors.text),
+                          const SizedBox(width: 4),
+                          Text(
+                            tag,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: colors.text,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
               const SizedBox(height: 16),
               // 原文表示エリア — Section 1-E: outlineDecoration
               GestureDetector(

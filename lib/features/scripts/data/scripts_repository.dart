@@ -73,6 +73,7 @@ class ScriptsRepository {
     DateTime? targetDate,
     int sortOrder = 0,
     List<String>? pinnedClozeWords,
+    String rank = 'B',
   }) async {
     final parentheses = TextNormalizer.parseParenthesesMode(parenthesesMode);
     final hiragana = await TextNormalizer.fullNormalize(
@@ -118,6 +119,7 @@ class ScriptsRepository {
       nextReviewAt: nextReviewAt,
       sortOrder: finalSortOrder,
       pinnedClozeWords: pinnedClozeWords ?? [],
+      rank: rank,
     );
     await _box.add(script);
     return script;
@@ -204,8 +206,11 @@ final selectedTagsProvider = StateProvider<Set<String>>((ref) => {});
 // 並び替えモード: 'lastPracticed' | 'sortOrder' | 'level'
 final sortModeProvider = StateProvider<String>((ref) => 'sortOrder');
 
-// レベルフィルタ用プロバイダ（null = すべて）
-final levelFilterProvider = StateProvider<int?>((ref) => null);
+// レベルフィルタ用プロバイダ（複数選択、空は「すべて」）
+final levelFilterProvider = StateProvider<Set<int>>((ref) => {});
+
+// ランクフィルタ用プロバイダ（複数選択、空は「すべて」）
+final rankFilterProvider = StateProvider<Set<String>>((ref) => {});
 
 class ScriptsListNotifier extends StateNotifier<List<Script>> {
   final ScriptsRepository _repository;
@@ -226,6 +231,7 @@ class ScriptsListNotifier extends StateNotifier<List<Script>> {
     DateTime? targetDate,
     int sortOrder = 0,
     List<String>? pinnedClozeWords,
+    String rank = 'B',
   }) async {
     final script = await _repository.add(
       title: title,
@@ -235,6 +241,7 @@ class ScriptsListNotifier extends StateNotifier<List<Script>> {
       targetDate: targetDate,
       sortOrder: sortOrder,
       pinnedClozeWords: pinnedClozeWords,
+      rank: rank,
     );
     refresh();
     return script;
