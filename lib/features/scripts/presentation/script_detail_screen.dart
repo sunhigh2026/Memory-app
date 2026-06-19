@@ -192,7 +192,8 @@ class ScriptDetailScreen extends ConsumerWidget {
           ],
         ),
       ),
-    );
+    ), // Scaffold
+    ); // PopScope
   }
 
   void _showLevelSelectionBottomSheet(BuildContext context, Script script) {
