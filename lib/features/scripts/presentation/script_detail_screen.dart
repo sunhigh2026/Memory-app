@@ -29,48 +29,45 @@ class ScriptDetailScreen extends ConsumerWidget {
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('No. ${script.sortOrder} ${script.title}'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () => context.push('/edit/${script.id}'),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        context.go('/');
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('No. ${script.sortOrder} ${script.title}'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.go('/'),
           ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // メタ情報
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                _InfoChip(
-                  icon: Icons.bar_chart,
-                  label: 'Level ${script.currentLevel}',
-                ),
-                _InfoChip(
-                  icon: Icons.repeat,
-                  label: '${script.practiceCount}回練習',
-                ),
-                _InfoChip(
-                  icon: Icons.star_border,
-                  label: 'ランク: ${script.rank}',
-                ),
-                ...script.tags.map((tag) => _InfoChip(
-                      icon: Icons.label_outline,
-                      label: tag,
-                    )),
-              ],
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: () => context.push('/edit/${script.id}'),
             ),
+          ],
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // メタ情報（ランク→レベル→◯回練習→タグの順）
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  _RankChip(rank: script.rank),
+                  _LevelChip(level: script.currentLevel),
+                  _InfoChip(
+                    icon: Icons.repeat,
+                    label: '${script.practiceCount}回練習',
+                  ),
+                  ...script.tags.map((tag) => _TagChip(tag: tag)),
+                ],
+              ),
             const SizedBox(height: 16),
             // 原文表示 — Section 1-E: outlineDecoration
             Container(
@@ -875,6 +872,151 @@ class _AllowedPairsSection extends ConsumerWidget {
                 ),
               )),
       ],
+    );
+  }
+}
+
+// ランクチップ（色分け）
+Color _rankColor(String rank) {
+  switch (rank) {
+    case 'S':
+      return const Color(0xFFD4AF37); // ゴールド
+    case 'A':
+      return const Color(0xFF3949AB); // インディゴ（primary）
+    case 'B':
+      return const Color(0xFF00897B); // ティール（secondary）
+    case 'C':
+    default:
+      return const Color(0xFF9E9E9E); // グレー
+  }
+}
+
+class _RankChip extends StatelessWidget {
+  final String rank;
+
+  const _RankChip({required this.rank});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _rankColor(rank);
+    return Semantics(
+      label: 'ランク: $rank',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+          border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.star_border, size: 14, color: color),
+            const SizedBox(width: 4),
+            Text(
+              'ランク: $rank',
+              style: TextStyle(
+                fontSize: 12,
+                color: color,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Color _levelColor(int level) {
+  switch (level) {
+    case 0:
+      return const Color(0xFF9E9E9E); // グレー
+    case 1:
+      return const Color(0xFFF59E0B); // アンバー
+    case 2:
+      return const Color(0xFF3949AB); // インディゴ
+    case 3:
+      return const Color(0xFF00897B); // ティール
+    case 4:
+    case 5:
+    case 6:
+    case 7:
+    default:
+      return const Color(0xFFD4AF37); // ゴールド
+  }
+}
+
+class _LevelChip extends StatelessWidget {
+  final int level;
+
+  const _LevelChip({required this.level});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _levelColor(level);
+    return Semantics(
+      label: 'Level $level',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+          border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.bar_chart, size: 14, color: color),
+            const SizedBox(width: 4),
+            Text(
+              'Level $level',
+              style: TextStyle(
+                fontSize: 12,
+                color: color,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// タグ専用チップ（タグ名で色分け）
+class _TagChip extends StatelessWidget {
+  final String tag;
+
+  const _TagChip({required this.tag});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppTheme.tagColor(tag);
+    return Semantics(
+      label: tag,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: colors.background,
+          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.label_outline, size: 14, color: colors.text),
+            const SizedBox(width: 4),
+            Text(
+              tag,
+              style: TextStyle(
+                fontSize: 12,
+                color: colors.text,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

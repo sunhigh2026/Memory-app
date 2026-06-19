@@ -381,15 +381,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         flex: 3,
                         child: DropdownButtonFormField<String>(
                           value: sortMode,
-                          decoration: const InputDecoration(
+                          isExpanded: true,
+                          decoration: InputDecoration(
                             labelText: '並び替え',
                             isDense: true,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                              borderSide: const BorderSide(color: AppTheme.grey300),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                              borderSide: const BorderSide(color: AppTheme.primary, width: 2),
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                              borderSide: const BorderSide(color: AppTheme.grey300),
+                            ),
                           ),
                           items: const [
-                            DropdownMenuItem(value: 'lastPracticed', child: Text('学習順')),
-                            DropdownMenuItem(value: 'sortOrder', child: Text('番号順')),
-                            DropdownMenuItem(value: 'level', child: Text('レベル順')),
+                            DropdownMenuItem(value: 'lastPracticed', child: Text('学習順', overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(value: 'sortOrder', child: Text('番号順', overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(value: 'level', child: Text('レベル順', overflow: TextOverflow.ellipsis)),
                           ],
                           onChanged: (val) {
                             if (val != null) {
@@ -893,53 +906,10 @@ class _ScriptCard extends ConsumerWidget {
                     ),
                   ),
                   if (script.rank.isNotEmpty) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      margin: const EdgeInsets.only(right: 6),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                        border: Border.all(
-                          color: AppTheme.primary.withValues(alpha: 0.2),
-                          width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        script.rank,
-                        style: const TextStyle(
-                          color: AppTheme.primary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
+                    _buildRankBadge(script.rank),
+                    const SizedBox(width: 6),
                   ],
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: levelColor(script.currentLevel),
-                      borderRadius:
-                          BorderRadius.circular(AppTheme.radiusSm),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.local_fire_department,
-                            size: 12, color: Colors.white),
-                        const SizedBox(width: 2),
-                        Text(
-                          '${script.currentLevel}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  _buildLevelBadge(script.currentLevel),
                 ],
               ),
               if (script.tags.isNotEmpty) ...[
@@ -1020,7 +990,70 @@ class _ScriptCard extends ConsumerWidget {
     if (diff.inDays < 7) return '${diff.inDays}日前';
     return '${(diff.inDays / 7).floor()}週間前';
   }
+
+  // ランクバッジ（色分け）
+  Widget _buildRankBadge(String rank) {
+    Color color;
+    switch (rank) {
+      case 'S':
+        color = const Color(0xFFD4AF37); // ゴールド
+        break;
+      case 'A':
+        color = AppTheme.primary; // インディゴ
+        break;
+      case 'B':
+        color = AppTheme.secondary; // ティール
+        break;
+      case 'C':
+      default:
+        color = AppTheme.grey500; // グレー
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
+      ),
+      child: Text(
+        rank,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  // レベルバッジ（色分け）
+  Widget _buildLevelBadge(int level) {
+    final color = levelColor(level);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.local_fire_department, size: 12, color: Colors.white),
+          const SizedBox(width: 2),
+          Text(
+            '$level',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
 
 class _MultiSelectDropdown<T> extends StatefulWidget {
   final String label;
