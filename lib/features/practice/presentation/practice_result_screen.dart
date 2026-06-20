@@ -86,7 +86,6 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
       );
 
       final progressRepo = ref.read(progressRepositoryProvider);
-      print('[PracticeResult] Calling progressRepo.addSession...');
       await progressRepo.addSession(
         scriptId: widget.scriptId,
         mode: 'cloze',
@@ -94,20 +93,15 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
         score: widget.score,
         durationSeconds: widget.durationSeconds,
       );
-      print('[PracticeResult] Session saved successfully.');
 
       final scripts = ref.read(scriptsListProvider);
       final script = scripts.firstWhere((s) => s.id == widget.scriptId);
-      print('[PracticeResult] Found script: ${script.title}, before level: ${script.currentLevel}');
       
-      print('[PracticeResult] Calling progressRepo.updateScriptProgress...');
       await progressRepo.updateScriptProgress(
           script, widget.score, 'cloze', widget.level, mistakes: widget.mistakes);
-      print('[PracticeResult] Script progress updated successfully.');
       
-      print('[PracticeResult] Refreshing scripts list provider...');
       ref.read(scriptsListProvider.notifier).refresh();
-      print('[PracticeResult] Provider refreshed.');
+
 
       controller.close();
       if (mounted) {
@@ -116,10 +110,8 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
           duration: Duration(seconds: 2),
         ));
       }
-    } catch (e, stackTrace) {
+    } catch (e) {
       _saved = false; // 再試行可能に
-      print('[PracticeResult] 保存エラー: $e');
-      print('[PracticeResult] スタックトレース: $stackTrace');
       controller?.close();
       if (mounted) {
         messenger.showSnackBar(SnackBar(

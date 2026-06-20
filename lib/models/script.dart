@@ -18,7 +18,7 @@ class Script extends HiveObject {
   late String category; // 後方互換性のため残す
 
   @HiveField(4)
-  late int currentLevel; // 1-4
+  late int currentLevel; // 0-8
 
   @HiveField(5)
   late int practiceCount;
@@ -116,22 +116,27 @@ class Script extends HiveObject {
   double get progressPercent {
     switch (currentLevel) {
       case 1:
-        return correctRate * 0.25;
+        return correctRate * 25;
       case 2:
-        return 25 + correctRate * 0.25;
+        return 25 + correctRate * 12.5;
       case 3:
-        return 50 + correctRate * 0.25;
+        return 37.5 + correctRate * 12.5;
       case 4:
+        return 50 + correctRate * 12.5;
       case 5:
+        return 62.5 + (bestVoiceScore / 100) * 9;
       case 6:
+        return 71.5 + (bestVoiceScore / 100) * 9;
       case 7:
-        return 75 + (bestVoiceScore / 100) * 25;
+        return 80.5 + (bestVoiceScore / 100) * 9;
+      case 8:
+        return 89.5 + (bestVoiceScore / 100) * 10.5;
       default:
-        return 0;
+        return 0; // Level 0 = 未練習
     }
   }
 
-  bool get isMastered => currentLevel >= 4 && bestVoiceScore >= 85;
+  bool get isMastered => currentLevel >= 8 && bestVoiceScore >= 85;
 
   bool get isReviewDue {
     if (nextReviewAt == null) return practiceCount > 0;

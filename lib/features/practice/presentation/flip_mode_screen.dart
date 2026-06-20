@@ -208,7 +208,7 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
               }
             },
           ),
-          title: Text('No. ${_script.sortOrder} ${_script.title} (Lv0)'),
+          title: Text('No. ${_script.sortOrder} ${_script.title} (Lv2)'),
           actions: [
             Center(
               child: Padding(
