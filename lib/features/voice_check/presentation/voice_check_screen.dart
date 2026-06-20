@@ -18,10 +18,10 @@ import '../../../models/script.dart';
 import '../data/allowed_pairs_repository.dart';
 
 enum HintLevel {
-  showAll,            // Level 4
-  firstAndLastChars,  // Level 5 (文頭・文末)
-  particles,          // Level 6 (助詞)
-  hidden,             // Level 7 (完全暗唱)
+  showAll,            // Level 5
+  firstAndLastChars,  // Level 6 (文頭・文末)
+  particles,          // Level 7 (助詞)
+  hidden,             // Level 8 (完全暗唱)
 }
 
 class VoiceCheckScreen extends ConsumerStatefulWidget {
@@ -69,16 +69,16 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
   void initState() {
     super.initState();
     switch (widget.level) {
-      case 5:
+      case 6:
         _hintLevel = HintLevel.firstAndLastChars;
         break;
-      case 6:
+      case 7:
         _hintLevel = HintLevel.particles;
         break;
-      case 7:
+      case 8:
         _hintLevel = HintLevel.hidden;
         break;
-      case 4:
+      case 5:
       default:
         _hintLevel = HintLevel.showAll;
         break;
@@ -310,35 +310,6 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildRecognitionText(),
-                      if (_isRecording)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Row(
-                            children: [
-                              SizedBox(
-                                width: 12,
-                                height: 12,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: _isListeningStarted
-                                      ? AppTheme.secondary
-                                      : AppTheme.primary,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                _isListeningStarted ? 'お話しください 🎤' : '準備中...',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: _isListeningStarted
-                                      ? AppTheme.secondary
-                                      : AppTheme.grey500,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                     ],
                   ),
                 ),
@@ -415,6 +386,35 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
                       fontWeight: FontWeight.w500,
                     ),
                   ),
+                  if (_isRecording) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: _isListeningStarted
+                                ? AppTheme.secondary
+                                : AppTheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _isListeningStarted ? 'お話しください 🎤' : '準備中...',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _isListeningStarted
+                                ? AppTheme.secondary
+                                : AppTheme.grey500,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -800,7 +800,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
                       child: ElevatedButton(
                         onPressed: () {
                           final passed = result.similarityScore >= 80;
-                          if (passed && widget.level < 7) {
+                          if (passed && widget.level < 8) {
                             context.pushReplacement(
                                 '/voice-check/${widget.scriptId}/${widget.level + 1}');
                           } else {
@@ -814,7 +814,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
                             });
                           }
                         },
-                        child: Text((result.similarityScore >= 80 && widget.level < 7)
+                        child: Text((result.similarityScore >= 80 && widget.level < 8)
                             ? '次のレベルへ'
                             : 'もう一度挑戦'),
                       ),
@@ -846,14 +846,14 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
                     ),
                   ),
                 ],
-                if (result.similarityScore < 80 && widget.level > 1) ...[
+                if (result.similarityScore < 80 && widget.level > 2) ...[
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
                         final prevLevel = widget.level - 1;
-                        if (prevLevel <= 3) {
+                        if (prevLevel < 5) {
                           context.pushReplacement(
                               '/practice/${widget.scriptId}/$prevLevel');
                         } else {
@@ -903,35 +903,85 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
     final lines = text.split('\n');
     final resultLines = lines.map((line) {
       if (line.isEmpty) return '';
-      
+
+      // 1. 文頭の記号・番号（①、1.、- など）を検出
+      final symbolRegex = RegExp(r'^([0-9０-９a-zA-Zａ-ｚＡ-Ｚ①-⑳㈠-㈩\.\-－‐—―−⁃✓■◆▲●○・\s　]+)');
+      final match = symbolRegex.firstMatch(line);
+      final prefixLength = match != null ? match.group(0)!.length : 0;
+      final prefixText = prefixLength > 0 ? line.substring(0, prefixLength) : '';
+      final bodyText = prefixLength > 0 ? line.substring(prefixLength) : line;
+
+      if (bodyText.isEmpty) {
+        return prefixText;
+      }
+
+      // 2. 本文の文頭キーワード（最初の2文字）を取得
       final punc = RegExp(r'[。、？！\s　]');
-      final validIndices = <int>[];
-      for (int i = 0; i < line.length; i++) {
-        if (!punc.hasMatch(line[i])) {
-          validIndices.add(i);
+      final validBodyIndices = <int>[];
+      for (int i = 0; i < bodyText.length; i++) {
+        if (!punc.hasMatch(bodyText[i])) {
+          validBodyIndices.add(i);
         }
       }
 
-      if (validIndices.length <= 4) {
-        return line;
+      // 本文が短すぎる場合はそのまま返す
+      if (validBodyIndices.length <= 4) {
+        return prefixText + bodyText;
       }
 
-      final showIndices = {
-        validIndices[0],
-        validIndices[1],
-        validIndices[validIndices.length - 2],
-        validIndices[validIndices.length - 1]
-      };
+      // 文頭の表示対象インデックス（本文基準）
+      final showIndices = <int>{};
+      if (validBodyIndices.isNotEmpty) showIndices.add(validBodyIndices[0]);
+      if (validBodyIndices.length >= 2) showIndices.add(validBodyIndices[1]);
+
+      // 3. Budoux を使用した文末キーワードの抽出
+      String lastWord = '';
+      try {
+        final chunks = _budouxParser.parse(bodyText).toList();
+        if (chunks.isNotEmpty) {
+          var lastChunk = chunks.last;
+          // 文末の句読点等は除く
+          lastChunk = lastChunk.replaceAll(RegExp(r'[。、？！\s　]+$'), '');
+          
+          if (lastChunk.length <= 2 && chunks.length >= 2) {
+            // 末尾チャンクが短い（例: 「ある」「だ」など）場合は、一つ前のチャンクも結合
+            var prevChunk = chunks[chunks.length - 2];
+            lastWord = prevChunk + lastChunk;
+          } else {
+            lastWord = lastChunk;
+          }
+        }
+      } catch (_) {}
+
+      // もしBudouxでの抽出がうまくいかない・空の場合は従来の末尾2文字にフォールバック
+      if (lastWord.isEmpty) {
+        final lastIdx1 = validBodyIndices[validBodyIndices.length - 1];
+        final lastIdx2 = validBodyIndices[validBodyIndices.length - 2];
+        lastWord = bodyText[lastIdx2] + bodyText[lastIdx1];
+      }
+
+      // 本文内の文末キーワードの開始位置を検索（末尾から検索して安全にマッチさせる）
+      final lastWordStart = bodyText.lastIndexOf(lastWord);
 
       final buffer = StringBuffer();
-      for (int i = 0; i < line.length; i++) {
-        final char = line[i];
-        if (punc.hasMatch(char) || showIndices.contains(i)) {
+      // 記号部分はそのまま追加
+      buffer.write(prefixText);
+
+      for (int i = 0; i < bodyText.length; i++) {
+        final char = bodyText[i];
+        
+        // 句読点等の記号、または文頭ヒント位置、または文末キーワードに含まれる範囲ならそのまま表示
+        final isPunc = punc.hasMatch(char);
+        final isFrontHint = showIndices.contains(i);
+        final isBackHint = lastWordStart != -1 && i >= lastWordStart && i < lastWordStart + lastWord.length;
+
+        if (isPunc || isFrontHint || isBackHint) {
           buffer.write(char);
         } else {
           buffer.write('＿');
         }
       }
+
       return buffer.toString();
     });
     return resultLines.join('\n');
@@ -983,9 +1033,9 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
-            for (int lvl = 4; lvl <= 7; lvl++) ...[
+            for (int lvl = 5; lvl <= 8; lvl++) ...[
               _buildLevelOption(ctx, lvl, scriptId, currentLevel),
-              if (lvl < 7) const SizedBox(height: 8),
+              if (lvl < 8) const SizedBox(height: 8),
             ],
             const SizedBox(height: 16),
             OutlinedButton(
@@ -1000,10 +1050,10 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
 
   Widget _buildLevelOption(BuildContext sheetContext, int level, String scriptId, int currentLevel) {
     final labels = {
-      4: 'Level 4: 全文表示',
-      5: 'Level 5: 文頭・文末ヒント',
-      6: 'Level 6: 助詞ヒント',
-      7: 'Level 7: 完全暗唱',
+      5: 'Level 5: 全文表示',
+      6: 'Level 6: 文頭・文末ヒント',
+      7: 'Level 7: 助詞ヒント',
+      8: 'Level 8: 完全暗唱',
     };
     final isCurrent = level == currentLevel;
     return Container(

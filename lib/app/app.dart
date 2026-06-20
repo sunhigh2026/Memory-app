@@ -7,6 +7,10 @@ import '../features/scripts/presentation/script_add_screen.dart';
 import '../features/scripts/presentation/script_detail_screen.dart';
 import '../features/practice/presentation/practice_screen.dart';
 import '../features/practice/presentation/practice_result_screen.dart';
+import '../features/practice/presentation/flip_mode_screen.dart';
+
+
+
 import '../features/voice_check/presentation/voice_check_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/settings/presentation/tts_dictionary_screen.dart';
@@ -80,10 +84,16 @@ final _router = GoRouter(
       pageBuilder: (context, state) {
         final id = state.pathParameters['id']!;
         final level = int.parse(state.pathParameters['level']!);
+        if (level == 2) {
+          return _fadePage(
+              context, state, FlipModeScreen(scriptId: id));
+        }
         return _fadePage(
             context, state, PracticeScreen(scriptId: id, level: level));
       },
     ),
+
+
     GoRoute(
       path: '/practice-result',
       pageBuilder: (context, state) {
@@ -107,14 +117,14 @@ final _router = GoRouter(
       path: '/voice-check/:id',
       pageBuilder: (context, state) {
         final id = state.pathParameters['id']!;
-        return _fadePage(context, state, VoiceCheckScreen(scriptId: id, level: 4));
+        return _fadePage(context, state, VoiceCheckScreen(scriptId: id, level: 5));
       },
     ),
     GoRoute(
       path: '/voice-check/:id/:level',
       pageBuilder: (context, state) {
         final id = state.pathParameters['id']!;
-        final level = int.tryParse(state.pathParameters['level'] ?? '') ?? 4;
+        final level = int.tryParse(state.pathParameters['level'] ?? '') ?? 5;
         return _fadePage(
             context, state, VoiceCheckScreen(scriptId: id, level: level));
       },

@@ -95,12 +95,12 @@ class ProgressRepository {
       print('[progress_repository] Level set to 1 on first practice.');
     }
 
-    if (mode == 'cloze' && score >= 80 && level == script.currentLevel && script.currentLevel < 4) {
+    if (mode == 'cloze' && score >= 80 && level == script.currentLevel && script.currentLevel < 5) {
       script.currentLevel++;
       print('[progress_repository] Leveled Up! New level: ${script.currentLevel}');
     }
 
-    if (mode == 'voice' && score >= 80 && level == script.currentLevel && script.currentLevel >= 4 && script.currentLevel < 7) {
+    if (mode == 'voice' && score >= 80 && level == script.currentLevel && script.currentLevel >= 5 && script.currentLevel < 8) {
       script.currentLevel++;
       print('[progress_repository] Voice Leveled Up! New level: ${script.currentLevel}');
     }

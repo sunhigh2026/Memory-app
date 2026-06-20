@@ -1,4 +1,4 @@
-﻿import 'dart:math';
+import 'dart:math';
 import '../../../core/utils/japanese_utils.dart';
 import '../../../models/cloze_word.dart';
 
@@ -185,15 +185,20 @@ class ClozeGenerator {
   static int densityForLevel(int level) {
     switch (level) {
       case 1:
-        return 20;
       case 2:
-        return 40;
+        return 20;
       case 3:
+        return 40;
+      case 4:
         return 60;
       default:
         return 15;
     }
   }
+
+
+
+
 
   /// 選択肢（4択）を生成
   List<String> generateChoices(String correctAnswer, List<ClozeWord> allClozeWords) {

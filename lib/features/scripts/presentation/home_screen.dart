@@ -16,13 +16,15 @@ Color levelColor(int level) {
     case 1:
       return AppTheme.accent;
     case 2:
-      return AppTheme.primary;
+      return const Color(0xFF9C27B0); // パープル
     case 3:
-      return AppTheme.secondary;
+      return AppTheme.primary;
     case 4:
+      return AppTheme.secondary;
     case 5:
     case 6:
     case 7:
+    case 8:
       return AppTheme.levelGold;
     default:
       return AppTheme.primary;
@@ -418,7 +420,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         child: _MultiSelectDropdown<int>(
                           label: 'レベル',
                           values: selectedLevels,
-                          items: const [0, 1, 2, 3, 4, 5, 6, 7],
+                          items: const [0, 1, 2, 3, 4, 5, 6, 7, 8],
                           itemLabelBuilder: (val) => 'Lv$val',
                           onChanged: (newValues) {
                             ref.read(levelFilterProvider.notifier).state = newValues;
