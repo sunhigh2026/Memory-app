@@ -8,6 +8,7 @@ import '../../scripts/data/scripts_repository.dart';
 import '../../tts/data/tts_dictionary_repository.dart';
 import '../../voice_check/data/speech_engine_type.dart';
 import '../../voice_check/data/model_download_service.dart';
+import '../../../core/data/backup_service.dart';
 
 // 設定用プロバイダ
 final clozeDensityProvider = StateProvider<int>((ref) => 15);
@@ -293,6 +294,90 @@ class SettingsScreen extends ConsumerWidget {
                     style: TextStyle(fontSize: 12, color: AppTheme.grey500),
                   ),
                 ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // データ管理
+          const SectionHeader(title: 'データ管理'),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: AppTheme.outlineDecoration,
+            child: Column(
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.backup, color: AppTheme.primary),
+                  title: const Text('バックアップの作成', style: TextStyle(fontSize: 16)),
+                  subtitle: Text(
+                    '現在のデータ（カード、練習履歴、辞書など）をファイルに保存します',
+                    style: TextStyle(fontSize: 12, color: AppTheme.grey500),
+                  ),
+                  onTap: () async {
+                    final success = await BackupService.exportBackup();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            success ? 'バックアップを保存しました' : 'バックアップの保存をキャンセルまたは失敗しました',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.restore, color: AppTheme.primary),
+                  title: const Text('バックアップから復元', style: TextStyle(fontSize: 16)),
+                  subtitle: Text(
+                    '以前保存したバックアップファイルからデータを復元します\n※現在のデータは上書きされます',
+                    style: TextStyle(fontSize: 12, color: AppTheme.grey500),
+                  ),
+                  onTap: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('バックアップ復元の確認'),
+                        content: const Text(
+                          'データを復元すると、現在登録されているカードや練習履歴はすべて消去され、バックアップデータに上書きされます。\n本当に復元しますか？',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: const Text('キャンセル'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.of(context).pop(true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primary,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('復元する'),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (confirmed == true && context.mounted) {
+                      final success = await BackupService.importBackup();
+                      if (context.mounted) {
+                        if (success) {
+                          ref.read(scriptsListProvider.notifier).refresh();
+                          ref.invalidate(ttsDictionaryListProvider);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('データを復元しました')),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('データの復元に失敗しました')),
+                          );
+                        }
+                      }
+                    }
+                  },
+                ),
               ],
             ),
           ),
