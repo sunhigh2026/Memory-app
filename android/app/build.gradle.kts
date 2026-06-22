@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.memorizationapp.memorization_app"
+    namespace = "com.hidapia.anripi"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.memorizationapp.memorization_app"
+        applicationId = "com.hidapia.anripi"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
