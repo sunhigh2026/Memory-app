@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/section_header.dart';
+import '../../../core/widgets/rank_chip.dart';
 import '../data/scripts_repository.dart';
 import '../../tts/presentation/tts_player_widget.dart';
 import '../../voice_check/data/allowed_pairs_repository.dart';
@@ -37,7 +38,7 @@ class ScriptDetailScreen extends ConsumerWidget {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text('No. ${script.sortOrder} ${script.title}'),
+          title: Text('No. ${script.sortOrder} 詳細'),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/'),
@@ -54,12 +55,21 @@ class ScriptDetailScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(
+                'No. ${script.sortOrder} ${script.title}',
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textDark,
+                ),
+              ),
+              const SizedBox(height: 12),
               // メタ情報（ランク→レベル→◯回練習→タグの順）
               Wrap(
                 spacing: 8,
                 runSpacing: 6,
                 children: [
-                  _RankChip(rank: script.rank),
+                  RankChip(rank: script.rank),
                   _LevelChip(level: script.currentLevel),
                   _InfoChip(
                     icon: Icons.repeat,
@@ -886,57 +896,7 @@ class _AllowedPairsSection extends ConsumerWidget {
   }
 }
 
-// ランクチップ（色分け）
-Color _rankColor(String rank) {
-  switch (rank) {
-    case 'S':
-      return const Color(0xFFD4AF37); // ゴールド
-    case 'A':
-      return const Color(0xFF3949AB); // インディゴ（primary）
-    case 'B':
-      return const Color(0xFF00897B); // ティール（secondary）
-    case 'C':
-    default:
-      return const Color(0xFF9E9E9E); // グレー
-  }
-}
 
-class _RankChip extends StatelessWidget {
-  final String rank;
-
-  const _RankChip({required this.rank});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _rankColor(rank);
-    return Semantics(
-      label: 'ランク: $rank',
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-          border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.star_border, size: 14, color: color),
-            const SizedBox(width: 4),
-            Text(
-              'ランク: $rank',
-              style: TextStyle(
-                fontSize: 12,
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 Color _levelColor(int level) {
   switch (level) {

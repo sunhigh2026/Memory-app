@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:budoux/budoux.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/text_normalizer.dart';
+import '../../../core/widgets/rank_chip.dart';
 import '../../scripts/data/scripts_repository.dart';
 import '../../progress/data/progress_repository.dart';
 import '../data/speech_recognition_service.dart';
@@ -187,6 +188,14 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
             },
           ),
           title: Text('No. ${_script.sortOrder} ${_script.title}'),
+          actions: [
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: RankChip(rank: _script.rank),
+              ),
+            ),
+          ],
         ),
       body: SingleChildScrollView(
         child: Padding(

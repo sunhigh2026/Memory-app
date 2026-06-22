@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/text_normalizer.dart';
 import '../../../core/widgets/animations/shake_widget.dart';
+import '../../../core/widgets/rank_chip.dart';
 import '../data/cloze_generator.dart';
 import '../../scripts/data/scripts_repository.dart';
 import '../../voice_check/data/speech_recognition_service.dart';
@@ -174,6 +175,12 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
           ),
           title: Text('No. ${_script.sortOrder} ${_script.title}'),
           actions: [
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: RankChip(rank: _script.rank),
+              ),
+            ),
             Center(
               child: Padding(
                 padding: const EdgeInsets.only(right: 16),

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/rank_chip.dart';
 import '../data/cloze_generator.dart';
 import '../../scripts/data/scripts_repository.dart';
 import '../../progress/data/progress_repository.dart';
@@ -210,6 +211,12 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
           ),
           title: Text('No. ${_script.sortOrder} ${_script.title} (Lv2)'),
           actions: [
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: RankChip(rank: _script.rank),
+              ),
+            ),
             Center(
               child: Padding(
                 padding: const EdgeInsets.only(right: 16),
