@@ -288,11 +288,12 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
                 ),
                 const SizedBox(height: 32),
                 // ボタン
-                Column(
-                  children: [
+                 Column(
+                   children: [
                     Row(
                       children: [
                         Expanded(
+                          flex: 2,
                           child: OutlinedButton(
                             onPressed: () =>
                                 context.go('/detail/${widget.scriptId}'),
@@ -301,6 +302,7 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
                         ),
                         const SizedBox(width: 12),
                         Expanded(
+                          flex: 3,
                           child: ElevatedButton(
                             onPressed: () {
                               final nextLevel = passed ? widget.level + 1 : widget.level;
@@ -312,12 +314,12 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
                                     '/practice/${widget.scriptId}/$nextLevel');
                               }
                             },
-                            child: Text(passed ? '次のレベル (Lv.${widget.level + 1}) へ' : 'もう一度'),
+                            child: Text(passed ? '次のレベルへ（Lv.${widget.level + 1}）' : 'もう一度'),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                     const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
