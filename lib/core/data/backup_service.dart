@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:hive/hive.dart';
@@ -115,18 +116,34 @@ class BackupService {
 
   static Future<bool> importBackup() async {
     try {
-      // 1. ファイルを選択して読込
+      // 1. ファイルを選択して読込 (Googleドライブ等でのグレーアウトを避けるため FileType.any を使用)
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-        withData: true,
+        type: FileType.any,
       );
 
-      if (result == null || result.files.single.bytes == null) {
+      if (result == null) {
         return false;
       }
 
-      final bytes = result.files.single.bytes!;
+      final file = result.files.single;
+
+      // 拡張子のチェック
+      final extension = file.name.split('.').last.toLowerCase();
+      if (extension != 'json') {
+        throw Exception('JSONファイルを選択してください。');
+      }
+
+      Uint8List bytes;
+      if (file.bytes != null) {
+        bytes = file.bytes!;
+      } else if (file.path != null) {
+        // file.bytes が null の場合はローカルのパスから直接読み込む
+        final ioFile = File(file.path!);
+        bytes = await ioFile.readAsBytes();
+      } else {
+        throw Exception('ファイルを読み込めませんでした。');
+      }
+
       final jsonString = utf8.decode(bytes);
       final Map<String, dynamic> backupMap = json.decode(jsonString);
 

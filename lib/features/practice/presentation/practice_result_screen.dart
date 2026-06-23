@@ -304,15 +304,15 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
                           child: ElevatedButton(
                             onPressed: () {
                               final nextLevel = passed ? widget.level + 1 : widget.level;
-                              if (nextLevel >= 4) {
+                              if (nextLevel >= 5) {
                                 context.pushReplacement(
-                                    '/voice-check/${widget.scriptId}/4');
+                                    '/voice-check/${widget.scriptId}/5');
                               } else {
                                 context.pushReplacement(
                                     '/practice/${widget.scriptId}/$nextLevel');
                               }
                             },
-                            child: Text(passed ? '次のレベルへ' : 'もう一度'),
+                            child: Text(passed ? '次のレベル (Lv.${widget.level + 1}) へ' : 'もう一度'),
                           ),
                         ),
                       ],
@@ -343,7 +343,7 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
                         ),
                       ),
                     ],
-                    if (!passed && widget.level > 0) ...[
+                    if (!passed && widget.level > 1) ...[
                       const SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,
