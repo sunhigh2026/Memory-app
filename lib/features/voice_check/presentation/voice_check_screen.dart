@@ -187,15 +187,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
               }
             },
           ),
-          title: Text('No. ${_script.sortOrder} ${_script.title}'),
-          actions: [
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.only(right: 16),
-                child: RankChip(rank: _script.rank),
-              ),
-            ),
-          ],
+          title: Text('${_script.sortOrder} ${_script.title}'),
         ),
       body: SingleChildScrollView(
         child: Padding(
@@ -210,12 +202,14 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              if (_script.tags.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  children: _script.tags.map((tag) {
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  RankChip(rank: _script.rank),
+                  ..._script.tags.map((tag) {
                     final colors = AppTheme.tagColor(tag);
                     return Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -239,9 +233,9 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
                         ],
                       ),
                     );
-                  }).toList(),
-                ),
-              ],
+                  }),
+                ],
+              ),
               const SizedBox(height: 16),
               // 原文表示エリア — Section 1-E: outlineDecoration
               GestureDetector(
@@ -725,7 +719,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
               padding: const EdgeInsets.all(16),
               decoration: AppTheme.cardDecoration,
               child: Text(
-                'No. ${_script.sortOrder} ${_script.title}',
+                '${_script.sortOrder} ${_script.title}',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -851,7 +845,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
                         backgroundColor: AppTheme.secondary,
                         foregroundColor: Colors.white,
                       ),
-                      child: Text('次の問題へ (No. ${_nextScript!.sortOrder})'),
+                      child: Text('次の問題へ (${_nextScript!.sortOrder})'),
                     ),
                   ),
                 ],

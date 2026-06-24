@@ -116,13 +116,13 @@ class Script extends HiveObject {
   double get progressPercent {
     switch (currentLevel) {
       case 1:
-        return correctRate * 25;
+        return (correctRate / 100) * 25;
       case 2:
-        return 25 + correctRate * 12.5;
+        return 25 + (correctRate / 100) * 12.5;
       case 3:
-        return 37.5 + correctRate * 12.5;
+        return 37.5 + (correctRate / 100) * 12.5;
       case 4:
-        return 50 + correctRate * 12.5;
+        return 50 + (correctRate / 100) * 12.5;
       case 5:
         return 62.5 + (bestVoiceScore / 100) * 9;
       case 6:

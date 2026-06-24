@@ -215,7 +215,7 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
                     children: [
                       if (script != null) ...[
                         Text(
-                          'No. ${script.sortOrder} ${script.title}',
+                          '${script.sortOrder} ${script.title}',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -341,7 +341,7 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
                             backgroundColor: AppTheme.secondary,
                             foregroundColor: Colors.white,
                           ),
-                          child: Text('次の問題へ (No. ${nextScript.sortOrder})'),
+                          child: Text('次の問題へ (${nextScript.sortOrder})'),
                         ),
                       ),
                     ],

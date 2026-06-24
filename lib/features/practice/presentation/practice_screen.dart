@@ -173,14 +173,8 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
               }
             },
           ),
-          title: Text('No. ${_script.sortOrder} ${_script.title}'),
+          title: Text('${_script.sortOrder} ${_script.title}'),
           actions: [
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: RankChip(rank: _script.rank),
-              ),
-            ),
             Center(
               child: Padding(
                 padding: const EdgeInsets.only(right: 16),
@@ -204,15 +198,17 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
               backgroundColor: AppTheme.grey200,
               valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary),
             ),
-            if (_script.tags.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: _script.tags.map((tag) {
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    RankChip(rank: _script.rank),
+                    ..._script.tags.map((tag) {
                       final colors = AppTheme.tagColor(tag);
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -236,11 +232,11 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
                           ],
                         ),
                       );
-                    }).toList(),
-                  ),
+                    }),
+                  ],
                 ),
               ),
-            ],
+            ),
             // テキスト表示（穴あき）— Section 5-B: AnimatedSwitcher
             Expanded(
               child: SingleChildScrollView(

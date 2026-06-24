@@ -38,7 +38,7 @@ class ScriptDetailScreen extends ConsumerWidget {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text('No. ${script.sortOrder} 詳細'),
+          title: Text('${script.sortOrder} ${script.title}'),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/'),
@@ -56,7 +56,7 @@ class ScriptDetailScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'No. ${script.sortOrder} ${script.title}',
+                '${script.sortOrder} ${script.title}',
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
