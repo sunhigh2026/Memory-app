@@ -249,7 +249,7 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
             ),
             const SizedBox(height: 16),
             // ピン留め重要語（pinnedClozeWords）入力欄
-            Text('穴埋め必須語（必ず穴にする語）',
+            Text('重要ワード（必ず穴にするワード）',
                 style: const TextStyle(fontSize: 14, color: AppTheme.grey600)),
             const SizedBox(height: 8),
             Wrap(
@@ -277,7 +277,7 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
                   child: TextField(
                     controller: _pinnedWordController,
                     decoration: const InputDecoration(
-                      hintText: '穴埋め必須語を入力',
+                      hintText: '重要ワードを入力',
                       isDense: true,
                       contentPadding: EdgeInsets.symmetric(
                         horizontal: 12,
