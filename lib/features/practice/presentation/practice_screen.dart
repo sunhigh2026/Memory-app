@@ -173,7 +173,10 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
               }
             },
           ),
-          title: Text('${_script.sortOrder} ${_script.title}'),
+          title: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Text('${_script.sortOrder}. ${_script.title}'),
+          ),
           actions: [
             Center(
               child: Padding(
