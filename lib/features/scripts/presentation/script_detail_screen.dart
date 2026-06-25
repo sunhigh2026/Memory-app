@@ -38,7 +38,10 @@ class ScriptDetailScreen extends ConsumerWidget {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text('${script.sortOrder} ${script.title}'),
+          title: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Text('${script.sortOrder}. ${script.title}'),
+          ),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/'),
@@ -56,7 +59,7 @@ class ScriptDetailScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${script.sortOrder} ${script.title}',
+                '${script.sortOrder}. ${script.title}',
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -94,7 +97,7 @@ class ScriptDetailScreen extends ConsumerWidget {
                 contextMenuBuilder: (context, editableTextState) {
                   final buttonItems = editableTextState.contextMenuButtonItems;
                   buttonItems.add(ContextMenuButtonItem(
-                    label: '重要に追加',
+                    label: '重要ワードに追加',
                     onPressed: () async {
                       final selection = editableTextState.currentTextEditingValue.selection;
                       final text = editableTextState.currentTextEditingValue.text;
@@ -108,7 +111,7 @@ class ScriptDetailScreen extends ConsumerWidget {
                             await script.save();
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('「$selectedText」を重要に追加しました')),
+                                SnackBar(content: Text('「$selectedText」を重要ワードに追加しました')),
                               );
                               ref.read(scriptsListProvider.notifier).refresh();
                             }
@@ -1093,7 +1096,7 @@ class _PinnedClozeWordsSectionState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(title: '重要（穴埋め固定）'),
+        const SectionHeader(title: '重要ワード（穴埋め固定）'),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
@@ -1103,7 +1106,7 @@ class _PinnedClozeWordsSectionState
             children: [
               if (pinnedWords.isEmpty)
                 Text(
-                  '登録されている重要語はありません（本文中のテキストを長押し選択して追加できます）',
+                  '登録されている重要ワードはありません（本文中のテキストを長押し選択して追加できます）',
                   style: TextStyle(fontSize: 13, color: AppTheme.grey500),
                 )
               else
