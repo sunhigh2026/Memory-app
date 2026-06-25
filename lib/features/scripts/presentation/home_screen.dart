@@ -774,7 +774,7 @@ class _ReviewDueCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      '${script.sortOrder} ${script.title}',
+                      '${script.sortOrder}. ${script.title}',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -899,7 +899,7 @@ class _ScriptCard extends ConsumerWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      '${script.sortOrder} ${script.title}',
+                      '${script.sortOrder}. ${script.title}',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
