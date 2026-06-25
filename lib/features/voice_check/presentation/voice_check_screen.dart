@@ -187,7 +187,10 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
               }
             },
           ),
-          title: Text('${_script.sortOrder} ${_script.title}'),
+          title: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Text('${_script.sortOrder}. ${_script.title}'),
+          ),
         ),
       body: SingleChildScrollView(
         child: Padding(
@@ -719,7 +722,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
               padding: const EdgeInsets.all(16),
               decoration: AppTheme.cardDecoration,
               child: Text(
-                '${_script.sortOrder} ${_script.title}',
+                '${_script.sortOrder}. ${_script.title}',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -818,7 +821,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
                           }
                         },
                         child: Text((result.similarityScore >= 80 && widget.level < 8)
-                            ? '次のレベルへ'
+                            ? '次のレベル（レベル${widget.level + 1}）へ'
                             : 'もう一度挑戦'),
                       ),
                     ),
@@ -845,7 +848,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
                         backgroundColor: AppTheme.secondary,
                         foregroundColor: Colors.white,
                       ),
-                      child: Text('次の問題へ (${_nextScript!.sortOrder})'),
+                      child: Text('次の問題（No.${_nextScript!.sortOrder}）へ'),
                     ),
                   ),
                 ],
