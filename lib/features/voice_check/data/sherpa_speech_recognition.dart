@@ -27,6 +27,7 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
   Function(String)? _onResult;
   Function(String)? _onPartialResult;
   Function(String)? _onError;
+  Function()? _onListeningStarted;
 
   // 音声バッファ（VADセグメント用）
   final List<double> _audioBuffer = [];
@@ -83,9 +84,9 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
         sileroVad: sherpa.SileroVadModelConfig(
           // silero_vad モデルは sherpa-onnx に内蔵
           model: '$modelDir/silero_vad.onnx',
-          threshold: 0.5,
+          threshold: 0.4,
           minSilenceDuration: 0.3,
-          minSpeechDuration: 0.25,
+          minSpeechDuration: 0.15,
           maxSpeechDuration: 30.0,
         ),
         sampleRate: _sampleRate,
@@ -124,6 +125,7 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
     _audioBuffer.clear();
     _onResult = onResult;
     _onPartialResult = onPartialResult;
+    _onListeningStarted = onListeningStarted;
     _onError = onError;
 
     // デバッグ状態初期化
@@ -152,9 +154,6 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
           _onError?.call('音声取得エラー: $error');
         },
       );
-
-      // ストリーム確立完了後、音声認識が完全に開始されたことをコールバックで通知
-      onListeningStarted?.call();
     } catch (e) {
       _isListening = false;
       onError('録音開始エラー: $e');
@@ -170,6 +169,10 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
       final elapsed = DateTime.now().difference(_recordingStartTime!);
       // ignore: avoid_print
       print('【音声認識】最初の音声チャンク受信完了: ${elapsed.inMilliseconds}ms');
+      
+      // 最初の音声チャンクが届いた（確実に録音が開始された）タイミングで振動を通知
+      _onListeningStarted?.call();
+      _onListeningStarted = null;
     }
 
     _totalSamplesReceived += bytes.length ~/ 2; // pcm16bits なので 2bytes = 1sample
