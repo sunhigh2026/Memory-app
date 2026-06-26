@@ -85,8 +85,10 @@ final _router = GoRouter(
         final id = state.pathParameters['id']!;
         final level = int.parse(state.pathParameters['level']!);
         if (level == 2) {
+          final extra = state.extra as Map<String, dynamic>?;
+          final retryWords = extra?['retryWords'] as List<String>?;
           return _fadePage(
-              context, state, FlipModeScreen(scriptId: id));
+              context, state, FlipModeScreen(scriptId: id, retryWords: retryWords));
         }
         return _fadePage(
             context, state, PracticeScreen(scriptId: id, level: level));

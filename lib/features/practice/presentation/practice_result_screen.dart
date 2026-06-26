@@ -328,6 +328,26 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
                         label: const Text('レベルを変更して再チャレンジ'),
                       ),
                     ),
+                    if (widget.level == 2 && widget.mistakes.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            context.pushReplacement(
+                              '/practice/${widget.scriptId}/2',
+                              extra: {'retryWords': widget.mistakes},
+                            );
+                          },
+                          icon: const Icon(Icons.replay),
+                          label: const Text('自信ない・わからないを復習（Lv.2)'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
                     if (nextScript != null && passed) ...[
                       const SizedBox(height: 12),
                       SizedBox(

@@ -19,10 +19,12 @@ enum EvaluationType {
 
 class FlipModeScreen extends ConsumerStatefulWidget {
   final String scriptId;
+  final List<String>? retryWords;
 
   const FlipModeScreen({
     super.key,
     required this.scriptId,
+    this.retryWords,
   });
 
   @override
@@ -72,6 +74,12 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
         densityPercent: 20,
         pinnedClozeWords: pinned,
       );
+    }
+
+    if (widget.retryWords != null && widget.retryWords!.isNotEmpty) {
+      _clozeWords = _clozeWords
+          .where((cw) => widget.retryWords!.contains(cw.word))
+          .toList();
     }
 
     // 各空欄の状態を初期化
@@ -140,33 +148,6 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
         _correctCount++;
       }
       _currentIndex++;
-    });
-  }
-
-  bool get _hasMistakes => _evaluatedStates.values.any((type) =>
-      type == EvaluationType.ambiguous || type == EvaluationType.wrong);
-
-  void _retryMistakes() {
-    final mistakes = <ClozeWord>[];
-    for (int i = 0; i < _clozeWords.length; i++) {
-      final eval = _evaluatedStates[i];
-      if (eval == EvaluationType.ambiguous || eval == EvaluationType.wrong) {
-        mistakes.add(_clozeWords[i]);
-      }
-    }
-
-    if (mistakes.isEmpty) return;
-
-    setState(() {
-      _clozeWords = mistakes;
-      _currentIndex = 0;
-      _correctCount = 0;
-      _revealedStates.clear();
-      _evaluatedStates.clear();
-      for (int i = 0; i < _clozeWords.length; i++) {
-        _revealedStates[i] = false;
-        _evaluatedStates[i] = null;
-      }
     });
   }
 
@@ -431,50 +412,26 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
                           )
                         : Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 24),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (_hasMistakes) ...[
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton.icon(
-                                      onPressed: _retryMistakes,
-                                      icon: const Icon(Icons.replay),
-                                      label: const Text('自信ない・わからないを復習'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.orange,
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(vertical: 16),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(30),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                ],
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    onPressed: _finishSession,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.primary,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(30),
-                                      ),
-                                    ),
-                                    child: const Text(
-                                      '結果を表示',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: _finishSession,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
                                   ),
                                 ),
-                              ],
+                                child: const Text(
+                                  '結果を表示',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                   ),
