@@ -18,6 +18,12 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
   Future<bool> initialize() async => false;
 
   @override
+  Future<void> warmUp() async {}
+
+  @override
+  Future<void> coolDown() async {}
+
+  @override
   Future<void> startListening({
     required Function(String) onResult,
     required Function(String) onPartialResult,
@@ -35,3 +41,4 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
   @override
   void dispose() {}
 }
+

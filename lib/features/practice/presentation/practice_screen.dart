@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -75,6 +74,11 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
       TweenSequenceItem(tween: Tween(begin: 1.04, end: 1.0), weight: 50),
     ]).animate(
         CurvedAnimation(parent: _scaleCtrl, curve: Curves.elasticOut));
+
+    // マイク常時起動（ウォーム）: initState後に非同期で実行する
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _warmUpMic();
+    });
   }
 
 
@@ -111,10 +115,27 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
 
   @override
   void dispose() {
+    // マイク常時起動を停止（画面退出時にマイクを解放する）
+    _coolDownMic();
     _inputController.dispose();
     _inputFocusNode.dispose();
     _scaleCtrl.dispose();
     super.dispose();
+  }
+
+  /// ウォームアップ: センスボイスの場合はマイクを常時起動
+  Future<void> _warmUpMic() async {
+    if (!mounted) return;
+    final speechService = ref.read(speechRecognitionServiceProvider);
+    final available = await speechService.initialize();
+    if (!available) return;
+    await speechService.warmUp();
+  }
+
+  /// クールダウン: 画面退出時にマイクを停止
+  void _coolDownMic() {
+    final speechService = ref.read(speechRecognitionServiceProvider);
+    speechService.coolDown();
   }
 
   Future<bool> _showExitConfirmationDialog() async {
@@ -602,9 +623,6 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
     await speechService.startListening(
       mode: RecognitionMode.immediate,
       listenFor: const Duration(seconds: 10), // 短い時間で十分
-      onListeningStarted: () {
-        HapticFeedback.vibrate();
-      },
       onResult: (text) {
         if (!mounted) return;
         setState(() {
@@ -634,9 +652,22 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
           final hiraText = await TextNormalizer.toHiragana(normalizedText);
           final hiraCorrect = await TextNormalizer.toHiragana(normalizedCorrect);
           if (hiraText.isNotEmpty && hiraCorrect.isNotEmpty) {
+            // 包含・曖昧一致チェック
             if (hiraText.contains(hiraCorrect) || TextNormalizer.isFuzzyMatch(hiraText, hiraCorrect)) {
               _stopVoiceInput();
               _checkAnswer(correctWord, correctWord); // 正解として送信
+              return;
+            }
+            // 3. 末尾一致チェック: 発話冒頭の欠落・同音異義語対策
+            // 正解文字列の末尾部分に認識結果が一致する場合、正解とみなす
+            // 条件: 一致部分が2文字以上、かつ認識結果が正解の60%以上の長さ
+            if (hiraText.length >= 2 &&
+                hiraCorrect.length >= 3 &&
+                hiraCorrect.endsWith(hiraText) &&
+                hiraText.length >= (hiraCorrect.length * 0.6).ceil()) {
+              _stopVoiceInput();
+              _checkAnswer(correctWord, correctWord); // 正解として送信
+              return;
             }
           }
         } catch (e) {

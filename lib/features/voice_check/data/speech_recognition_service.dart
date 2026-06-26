@@ -14,6 +14,17 @@ import 'model_download_service.dart';
 /// Phase 2 で sherpa-onnx に差し替え可能
 abstract class SpeechRecognitionService {
   Future<bool> initialize();
+
+  /// マイクを常時起動状態（ウォーム）にする。
+  /// センスボイス使用時は、練習画面を開いている間ずっとマイクストリームを維持し
+  /// リングバッファに音声を溜め続けることで、startListening 呼び出し時の起動ラグをゼロにする。
+  /// Android標準エンジンでは何もしない（no-op）。
+  Future<void> warmUp();
+
+  /// ウォーム状態を解除してマイクストリームを完全に停止する。
+  /// 練習画面から離脱するタイミングで呼び出す。
+  Future<void> coolDown();
+
   Future<void> startListening({
     required Function(String) onResult,
     required Function(String) onPartialResult,
@@ -66,6 +77,16 @@ class NativeSpeechRecognition implements SpeechRecognitionService {
       _isInitialized = true;
     }
     return available;
+  }
+
+  @override
+  Future<void> warmUp() async {
+    // Android標準エンジンは常時起動不要のため何もしない
+  }
+
+  @override
+  Future<void> coolDown() async {
+    // Android標準エンジンは常時起動不要のため何もしない
   }
 
   @override

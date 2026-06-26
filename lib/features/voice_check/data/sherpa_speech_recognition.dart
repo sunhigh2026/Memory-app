@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:typed_data';
 import 'package:record/record.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
@@ -14,14 +15,10 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
   StreamSubscription? _audioSubscription;
 
   bool _isListening = false;
+  bool _isWarmedUp = false;
   bool _stopping = false;
   String _accumulatedText = '';
   RecognitionMode _currentMode = RecognitionMode.fullRecitation;
-
-  // デバッグ用状態管理
-  DateTime? _recordingStartTime;
-  int _totalSamplesReceived = 0;
-  bool _firstChunkReceived = false;
 
   // コールバック
   Function(String)? _onResult;
@@ -31,6 +28,10 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
   // 音声バッファ（VADセグメント用）
   final List<double> _audioBuffer = [];
   static const int _sampleRate = 16000;
+
+  // プリパディング用リングバッファ（直近300ms = 4800サンプル）
+  static const int _prePadSamples = 4800; // 300ms @ 16kHz
+  final Queue<double> _ringBuffer = Queue<double>();
 
   final ModelDownloadService _downloadService;
 
@@ -103,6 +104,83 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
     }
   }
 
+  /// マイクを常時起動状態（ウォーム）にする。
+  /// 練習画面を開いた直後に呼び出し、マイクストリームを維持し続けることで
+  /// 録音開始時のラグをゼロにする。音声はリングバッファに蓄積するのみで認識はしない。
+  @override
+  Future<void> warmUp() async {
+    if (_isWarmedUp || _isListening) return;
+    if (_recognizer == null) return;
+
+    // ignore: avoid_print
+    print('【音声認識】ウォームアップ開始: マイク常時起動');
+
+    try {
+      final audioStream = await _audioRecorder.startStream(
+        const RecordConfig(
+          encoder: AudioEncoder.pcm16bits,
+          sampleRate: _sampleRate,
+          numChannels: 1,
+          autoGain: true,
+          echoCancel: false,
+          noiseSuppress: false,
+        ),
+      );
+
+      _isWarmedUp = true;
+      _ringBuffer.clear();
+
+      _audioSubscription = audioStream.listen(
+        (data) {
+          if (!_isWarmedUp) return;
+          final samples = _bytesToFloat32(Uint8List.fromList(data));
+
+          if (_isListening) {
+            // 認識中は通常の音声処理パイプラインへ
+            _processAudioChunk(samples);
+          } else {
+            // 待機中はリングバッファに直近300ms分だけ保持
+            _ringBuffer.addAll(samples);
+            while (_ringBuffer.length > _prePadSamples) {
+              _ringBuffer.removeFirst();
+            }
+          }
+        },
+        onError: (error) {
+          _onError?.call('音声取得エラー: $error');
+        },
+      );
+
+      // ignore: avoid_print
+      print('【音声認識】ウォームアップ完了: マイクストリーム確立');
+    } catch (e) {
+      _isWarmedUp = false;
+      // ignore: avoid_print
+      print('【音声認識】ウォームアップ失敗: $e');
+    }
+  }
+
+  /// ウォーム状態を解除してマイクストリームを完全に停止する。
+  /// 練習画面から離脱するタイミングで呼び出す。
+  @override
+  Future<void> coolDown() async {
+    if (!_isWarmedUp) return;
+
+    // ignore: avoid_print
+    print('【音声認識】クールダウン: マイクストリームを停止');
+
+    _isWarmedUp = false;
+    _isListening = false;
+    _stopping = false;
+
+    _audioSubscription?.cancel();
+    _audioSubscription = null;
+    await _audioRecorder.stop();
+    _ringBuffer.clear();
+    _audioBuffer.clear();
+    _vad?.reset();
+  }
+
   @override
   Future<void> startListening({
     required Function(String) onResult,
@@ -126,64 +204,59 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
     _onPartialResult = onPartialResult;
     _onError = onError;
 
-    // デバッグ状態初期化
-    _recordingStartTime = DateTime.now();
-    _totalSamplesReceived = 0;
-    _firstChunkReceived = false;
     // ignore: avoid_print
-    print('【音声認識】録音開始要求: $mode, 設定: 16kHz Mono');
+    print('【音声認識】認識開始: $mode, ウォーム状態: $_isWarmedUp');
 
-    try {
-      // 先に振動などの準備完了通知を呼び出し、振動のノイズが収まるのを待つ
+    if (_isWarmedUp) {
+      // ウォーム状態: マイクは既に起動済み。プリパディングをバッファに適用してすぐ開始
+      final prePad = List<double>.from(_ringBuffer);
+      _audioBuffer.addAll(prePad);
+      // VADにも先読みデータを流す
+      if (prePad.isNotEmpty) {
+        _vad?.acceptWaveform(Float32List.fromList(prePad));
+      }
+      // ignore: avoid_print
+      print('【音声認識】プリパディング適用: ${prePad.length}サンプル (${(prePad.length / _sampleRate * 1000).toInt()}ms)');
+
+      // 起動ラグがないため即座に通知（コールバックが設定されている場合のみ）
       onListeningStarted?.call();
-      await Future.delayed(const Duration(milliseconds: 250));
+    } else {
+      // ウォーム状態ではない場合はフォールバック（通常起動）
+      try {
+        final audioStream = await _audioRecorder.startStream(
+          const RecordConfig(
+            encoder: AudioEncoder.pcm16bits,
+            sampleRate: _sampleRate,
+            numChannels: 1,
+            autoGain: true,
+            echoCancel: false,
+            noiseSuppress: false,
+          ),
+        );
 
-      if (!_isListening) return; // 待機中に停止された場合の安全策
+        _audioSubscription = audioStream.listen(
+          (data) => _processAudioChunk(_bytesToFloat32(Uint8List.fromList(data))),
+          onError: (error) {
+            _onError?.call('音声取得エラー: $error');
+          },
+        );
 
-      // 音声ストリームを開始（PCM 16bit, 16kHz, mono）
-      // ノイズ抑制やエコー除去が話し始めの音声を切り落とす原因になるため false に設定
-      final audioStream = await _audioRecorder.startStream(
-        const RecordConfig(
-          encoder: AudioEncoder.pcm16bits,
-          sampleRate: _sampleRate,
-          numChannels: 1,
-          autoGain: true,
-          echoCancel: false,
-          noiseSuppress: false,
-        ),
-      );
-
-      _audioSubscription = audioStream.listen(
-        (data) => _processAudioChunk(Uint8List.fromList(data)),
-        onError: (error) {
-          _onError?.call('音声取得エラー: $error');
-        },
-      );
-    } catch (e) {
-      _isListening = false;
-      onError('録音開始エラー: $e');
+        onListeningStarted?.call();
+      } catch (e) {
+        _isListening = false;
+        onError('録音開始エラー: $e');
+      }
     }
   }
 
-  /// 音声チャンクを処理
-  void _processAudioChunk(Uint8List bytes) {
+  /// 音声データをパイプラインに流す（ウォーム状態でstartListening後に呼ばれる）
+  void _processAudioChunk(Float32List samples) {
     if (_stopping || !_isListening) return;
 
-    if (!_firstChunkReceived) {
-      _firstChunkReceived = true;
-      final elapsed = DateTime.now().difference(_recordingStartTime!);
-      // ignore: avoid_print
-      print('【音声認識】最初の音声チャンク受信完了: ${elapsed.inMilliseconds}ms');
-    }
-
-    _totalSamplesReceived += bytes.length ~/ 2; // pcm16bits なので 2bytes = 1sample
-
-    // PCM 16bit LE → Float32 に変換
-    final samples = _bytesToFloat32(bytes);
     _audioBuffer.addAll(samples);
 
     // VAD に音声を渡す
-    _vad?.acceptWaveform(Float32List.fromList(samples));
+    _vad?.acceptWaveform(samples);
 
     // VAD が音声セグメントを検出したか確認
     while (_vad != null && !(_vad!.isEmpty())) {
@@ -229,16 +302,23 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
     _stopping = true;
 
     // ignore: avoid_print
-    print('【音声認識】録音停止要求. 最後のマイクバッファ回収のため250ms待機します... (総受信サンプル数: $_totalSamplesReceived)');
+    print('【音声認識】認識停止. 最後のバッファ回収のため100ms待機...');
 
     // マイクバッファにたまっている音声が処理されるよう少し待つ
-    await Future.delayed(const Duration(milliseconds: 250));
+    await Future.delayed(const Duration(milliseconds: 100));
 
     _isListening = false;
 
-    _audioSubscription?.cancel();
-    _audioSubscription = null;
-    await _audioRecorder.stop();
+    if (!_isWarmedUp) {
+      // ウォーム状態でない場合はマイクも停止
+      _audioSubscription?.cancel();
+      _audioSubscription = null;
+      await _audioRecorder.stop();
+    } else {
+      // ウォーム状態の場合はマイクストリームは維持したまま
+      // リングバッファを新しい待機状態用にリセット
+      _ringBuffer.clear();
+    }
 
     // VAD をフラッシュして残りのセグメントを処理
     _vad?.flush();
@@ -263,6 +343,7 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
 
     _audioBuffer.clear();
     _vad?.reset();
+    _stopping = false;
   }
 
   /// PCM 16bit LE バイト列を Float32 サンプル列に変換
@@ -279,6 +360,7 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
   void dispose() {
     _stopping = true;
     _isListening = false;
+    _isWarmedUp = false;
     _audioSubscription?.cancel();
     _audioRecorder.dispose();
     _vad?.free();
