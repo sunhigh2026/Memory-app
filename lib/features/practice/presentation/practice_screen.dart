@@ -55,6 +55,9 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
   // 学習時間を測定するストップウォッチ
   final _stopwatch = Stopwatch();
 
+  // 正解文から生成したホットワードマップ
+  Map<String, String> _correctHotwordsMap = {};
+
   // Section 5-B: ShakeWidget と ScaleAnimation
   final _shakeKey = GlobalKey<ShakeWidgetState>();
   late final AnimationController _scaleCtrl;
@@ -83,9 +86,17 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
   }
 
 
-  void _loadScript() {
+  void _loadScript() async {
     final scripts = ref.read(scriptsListProvider);
     _script = scripts.firstWhere((s) => s.id == widget.scriptId);
+
+    // 非同期でホットワードマップを生成して保持
+    final hotwords = await TextNormalizer.generateHotwordsMap(_script.content);
+    if (mounted) {
+      setState(() {
+        _correctHotwordsMap = hotwords;
+      });
+    }
 
     final density = ClozeGenerator.densityForLevel(widget.level);
     final pinned = _script.pinnedClozeWords;
@@ -638,18 +649,24 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
     await speechService.startListening(
       mode: RecognitionMode.immediate,
       listenFor: const Duration(seconds: 10), // 短い時間で十分
-      onResult: (text) {
+      onResult: (text) async {
         if (!mounted) return;
         
-        // 最終結果（text）と画面上のテキスト（_inputController.text）のうち、
+        // 音声認識の最終結果に近傍補正を適用
+        final correctedText = await TextNormalizer.correctRecognizedText(
+          text,
+          _correctHotwordsMap,
+        );
+        
+        // 最終結果（correctedText）と画面上のテキスト（_inputController.text）のうち、
         // 文字数が長い（より完全である）方を最終判定テキストとして採用します。
-        String finalAnswer = text;
+        String finalAnswer = correctedText;
         final currentText = _inputController.text.trim();
-        if (currentText.length > text.length) {
+        if (currentText.length > correctedText.length) {
           finalAnswer = currentText;
         } else {
           setState(() {
-            _inputController.text = text;
+            _inputController.text = correctedText;
           });
         }
 
@@ -661,11 +678,18 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
       },
       onPartialResult: (text) async {
         if (!mounted) return;
+
+        // 音声認識の途中経過に近傍補正を適用
+        final correctedText = await TextNormalizer.correctRecognizedText(
+          text,
+          _correctHotwordsMap,
+        );
+
         setState(() {
-          _inputController.text = text;
+          _inputController.text = correctedText;
         });
 
-        final normalizedText = TextNormalizer.normalize(text);
+        final normalizedText = TextNormalizer.normalize(correctedText);
         final normalizedCorrect = TextNormalizer.normalize(correctWord);
 
         // 1. 完全一致・包含チェック (高速)
@@ -677,7 +701,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
 
         // 2. ひらがな（読み）の包含および曖昧一致チェック
         try {
-          final hiraText = await TextNormalizer.fullNormalize(text);
+          final hiraText = await TextNormalizer.fullNormalize(correctedText);
           final hiraCorrect = await TextNormalizer.fullNormalize(correctWord);
           if (hiraText.isNotEmpty && hiraCorrect.isNotEmpty) {
             // 包含・曖昧一致チェック

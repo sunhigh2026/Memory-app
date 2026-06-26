@@ -97,4 +97,68 @@ void main() {
       expect(norm, 'ぱそこんかんさ');
     });
   });
+
+  group('TextNormalizer.hotwordsCorrection', () {
+    test('generateHotwordsMapが正味の名詞を抽出してマップを生成すること', () async {
+      final text = '委託者は受託者に対して、権利を主張できる。これやそれは除外される。';
+      final map = await TextNormalizer.generateHotwordsMap(text);
+      
+      // 名詞かつ2文字以上のものが含まれる
+      expect(map['いたくしゃ'], '委託者');
+      expect(map['じゅたくしゃ'], '受託者');
+      expect(map['けんり'], '権利');
+      
+      // 代名詞の「これ」「それ」や助詞などは含まれない
+      expect(map.containsKey('これ'), isFalse);
+      expect(map.containsKey('それ'), isFalse);
+      expect(map.containsKey('は'), isFalse);
+    });
+
+    test('距離1の誤変換が正しく補正される (痛く者 -> 委託者)', () async {
+      final hotwords = {'いたくしゃ': '委託者'};
+      final corrected = await TextNormalizer.correctRecognizedText('痛く者です', hotwords);
+      expect(corrected, '委託者です');
+    });
+
+    test('距離2以上の場合は補正されず素のまま戻る', () async {
+      final hotwords = {'いたくしゃ': '委託者'};
+      // 「全く別な」 -> 「いたくしゃ」への距離は大幅に離れている
+      final corrected = await TextNormalizer.correctRecognizedText('全く別なです', hotwords);
+      expect(corrected, '全く別なです');
+    });
+
+    test('多義箇所で距離が一意に最小なら採用される', () async {
+      final hotwords = {
+        'いたくしゃ': '委託者',
+        'じゅたくしゃ': '受託者',
+      };
+      // 「いたくし」 -> 「いたくしゃ」(距離1), 「じゅたくしゃ」(距離2)
+      // 最小距離は1（一意）なので補正される
+      final corrected = await TextNormalizer.correctRecognizedText('いたくしです', hotwords);
+      expect(corrected, '委託者です');
+    });
+
+    test('多義箇所で最小距離が同距離タイなら補正されない', () async {
+      final hotwords = {
+        'いたくしゃ': '委託者',
+        'おたくしゃ': '御託者',
+      };
+      // 「うたくしゃ」 -> 「いたくしゃ」(距離1), 「おたくしゃ」(距離1)
+      // 最小距離1だがタイなので補正されない
+      final corrected = await TextNormalizer.correctRecognizedText('うたくしゃです', hotwords);
+      expect(corrected, 'うたくしゃです');
+    });
+
+    test('補正対象が無い場合は入力がそのまま返る', () async {
+      final hotwords = <String, String>{};
+      final corrected = await TextNormalizer.correctRecognizedText('テストです', hotwords);
+      expect(corrected, 'テストです');
+    });
+
+    test('距離0でかつ表記も同じ場合は置換は発生しない（補正不要）', () async {
+      final hotwords = {'いたくしゃ': '委託者'};
+      final corrected = await TextNormalizer.correctRecognizedText('委託者です', hotwords);
+      expect(corrected, '委託者です');
+    });
+  });
 }

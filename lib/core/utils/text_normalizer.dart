@@ -212,4 +212,249 @@ class TextNormalizer {
 
     return dist <= maxDist;
   }
+
+  /// ホットワード近傍補正の最大許容編集距離（0で無効化）
+  static const int kHotwordCorrectionMaxDistance = 1;
+
+  /// 文全体を安全にトークン化する（助詞・助動詞で分割して個別にtokenizeすることでOOMを防ぐ）
+  static Future<List<Map<String, dynamic>>> _safeTokenize(String text) async {
+    if (text.isEmpty) return [];
+    
+    try {
+      final tokenizer = await _getTokenizer();
+      
+      // 助詞、助動詞、接続詞、句読点などでテキストを分割する
+      // これにより、OOMを引き起こす複雑な接続探索を避ける
+      final splitReg = RegExp(
+        r'[。、！？!?,.\s\n\r　・①-⑳㉑-㊿\d０-９\-‐―—\u200B-\u200D\uFEFF'
+        r'はがをにへとでもやで]+'
+        r'|です|ます|だ|である|した|する|して'
+      );
+      
+      final List<Map<String, dynamic>> allTokens = [];
+      int lastIdx = 0;
+      
+      for (final match in splitReg.allMatches(text)) {
+        final start = match.start;
+        final end = match.end;
+        
+        if (start > lastIdx) {
+          final word = text.substring(lastIdx, start).trim();
+          if (word.isNotEmpty) {
+            try {
+              final tokens = tokenizer.tokenize(word);
+              allTokens.addAll(tokens.cast<Map<String, dynamic>>());
+            } catch (_) {
+              allTokens.add({
+                'surface_form': word,
+                'reading': katakanaToHiragana(word),
+              });
+            }
+          }
+        }
+        
+        final delimiter = text.substring(start, end);
+        allTokens.add({
+          'surface_form': delimiter,
+          'reading': katakanaToHiragana(delimiter),
+          'pos': '記号',
+        });
+        
+        lastIdx = end;
+      }
+      
+      if (lastIdx < text.length) {
+        final word = text.substring(lastIdx).trim();
+        if (word.isNotEmpty) {
+          try {
+            final tokens = tokenizer.tokenize(word);
+            allTokens.addAll(tokens.cast<Map<String, dynamic>>());
+          } catch (_) {
+            allTokens.add({
+              'surface_form': word,
+              'reading': katakanaToHiragana(word),
+            });
+          }
+        }
+      }
+      
+      return allTokens;
+    } catch (e) {
+      // ignore: avoid_print
+      print('【デバッグ】_safeTokenizeエラー: $e');
+      return [
+        {
+          'surface_form': text,
+          'reading': katakanaToHiragana(text),
+        }
+      ];
+    }
+  }
+
+  /// 正解文から「ひらがな読み -> 漢字表層形」の専門用語マップを生成する
+  static Future<Map<String, String>> generateHotwordsMap(String correctText) async {
+    if (correctText.isEmpty) return {};
+    
+    try {
+      final tokens = await _safeTokenize(correctText);
+      final Map<String, String> hotwords = {};
+      
+      final currentSurface = StringBuffer();
+      final currentReading = StringBuffer();
+      
+      void flushBuffer() {
+        if (currentSurface.isNotEmpty) {
+          final surface = currentSurface.toString();
+          final reading = katakanaToHiragana(currentReading.toString()).replaceAll(RegExp(r'[^ぁ-ん]'), '');
+          // 読みが2文字以上かつ表層形も2文字以上の場合のみ登録（過補正防止）
+          if (reading.length >= 2 && surface.length >= 2) {
+            hotwords[reading] = surface;
+          }
+          currentSurface.clear();
+          currentReading.clear();
+        }
+      }
+      
+      for (final token in tokens) {
+        final pos = token['pos'] as String? ?? '';
+        final posDetail1 = token['pos_detail_1'] as String? ?? '';
+        final surface = token['surface_form'] as String? ?? '';
+        final reading = token['reading'] as String? ?? '';
+        
+        final isNoun = pos == '名詞';
+        // 代名詞、数、非自立は除外（接尾辞は直前の名詞と結合させるため除外しない）
+        final isExcludedNoun = posDetail1 == '代名詞' || posDetail1 == '数' || posDetail1 == '非自立';
+        
+        if (isNoun && !isExcludedNoun && reading.isNotEmpty && reading != '*') {
+          currentSurface.write(surface);
+          currentReading.write(reading);
+        } else {
+          flushBuffer();
+        }
+      }
+      flushBuffer();
+      
+      return hotwords;
+    } catch (e) {
+      // ignore: avoid_print
+      print('【デバッグ】generateHotwordsMapエラー: $e');
+      return {};
+    }
+  }
+
+  /// 認識結果のトークンを読みベースで近傍補正し、正しい漢字表層形に置換する
+  static Future<String> correctRecognizedText(
+    String recognizedText,
+    Map<String, String> hotwordsMap, {
+    int maxDistance = kHotwordCorrectionMaxDistance,
+  }) async {
+    if (hotwordsMap.isEmpty || recognizedText.isEmpty || maxDistance <= 0) {
+      return recognizedText;
+    }
+
+    try {
+      final tokens = await _safeTokenize(recognizedText);
+      
+      final List<Map<String, String>> tokenList = tokens.map((t) {
+        final surface = t['surface_form'] as String? ?? '';
+        final rawReading = t['reading'] as String? ?? '';
+        final reading = (rawReading == '*' || rawReading.isEmpty) 
+            ? katakanaToHiragana(surface) 
+            : katakanaToHiragana(rawReading);
+        
+        // 記号等を除去してひらがなのみにする
+        final cleanReading = reading.replaceAll(RegExp(r'[^ぁ-ん]'), '');
+        return {
+          'surface': surface,
+          'reading': cleanReading,
+        };
+      }).toList();
+
+
+      final int len = tokenList.length;
+      final List<bool> replaced = List.filled(len, false);
+      final resultSurfaces = <String>[];
+
+      int i = 0;
+      while (i < len) {
+        if (replaced[i]) {
+          i++;
+          continue;
+        }
+
+        String? bestMatchSurface;
+        int bestMatchTokensCount = 0;
+        int minDistance = maxDistance + 1;
+        bool isTie = false;
+        bool exactMatchFound = false;
+
+        // 1〜3個の連続するトークンを結合してホットワードと比較
+        for (int w = 1; w <= 3; w++) {
+          if (i + w > len) break;
+
+          final subTokens = tokenList.sublist(i, i + w);
+          final combinedReading = subTokens.map((t) => t['reading']!).join('');
+          final combinedSurface = subTokens.map((t) => t['surface']!).join('');
+
+          // まず、読みも表記も完全に一致しているホットワードがあるかチェック
+          for (final entry in hotwordsMap.entries) {
+            if (combinedReading == entry.key && combinedSurface == entry.value) {
+              exactMatchFound = true;
+              bestMatchTokensCount = w;
+              break;
+            }
+          }
+          if (exactMatchFound) {
+            break;
+          }
+
+          // 完全一致がない場合のみ、編集距離による曖昧マッチングを行う
+          for (final entry in hotwordsMap.entries) {
+            final hotwordReading = entry.key;
+            final hotwordSurface = entry.value;
+
+            // 読みも表記も一致しているものは上記で除外されているため、ここでは距離計算からスキップ
+            if (combinedReading == hotwordReading && combinedSurface == hotwordSurface) {
+              continue;
+            }
+
+            final dist = levenshtein(combinedReading, hotwordReading);
+            if (dist <= maxDistance) {
+              if (dist < minDistance) {
+                minDistance = dist;
+                bestMatchSurface = hotwordSurface;
+                bestMatchTokensCount = w;
+                isTie = false;
+              } else if (dist == minDistance && bestMatchSurface != hotwordSurface) {
+                isTie = true; // 同距離タイの競合検出
+              }
+            }
+          }
+        }
+
+        if (exactMatchFound) {
+          // 完全一致していた場合は、補正せず（そのままの表記を使用）トークン数分進める
+          for (int k = 0; k < bestMatchTokensCount; k++) {
+            resultSurfaces.add(tokenList[i + k]['surface']!);
+          }
+          i += bestMatchTokensCount;
+        } else if (bestMatchSurface != null && !isTie && minDistance <= maxDistance) {
+          resultSurfaces.add(bestMatchSurface);
+          for (int k = 0; k < bestMatchTokensCount; k++) {
+            replaced[i + k] = true;
+          }
+          i += bestMatchTokensCount;
+        } else {
+          resultSurfaces.add(tokenList[i]['surface']!);
+          i++;
+        }
+      }
+
+      return resultSurfaces.join('');
+    } catch (e) {
+      // ignore: avoid_print
+      print('【デバッグ】correctRecognizedTextエラー: $e');
+      return recognizedText;
+    }
+  }
 }
