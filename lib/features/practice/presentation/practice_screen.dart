@@ -477,7 +477,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
           children: [
             GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTapDown: (_) async {
+              onTap: () async {
                 if (_showingResult) {
                   // 結果表示中なら、次の問題へ進んでから音声入力を開始
                   _next();
@@ -487,11 +487,13 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
                     _startVoiceInput(nextTarget.word);
                   }
                 } else {
-                  _startVoiceInput(target.word);
+                  if (_isListeningVoiceInput) {
+                    _stopVoiceInput();
+                  } else {
+                    _startVoiceInput(target.word);
+                  }
                 }
               },
-              onTapUp: (_) => _stopVoiceInput(),
-              onTapCancel: () => _stopVoiceInput(),
               child: Container(
                 width: 48,
                 height: 48,
