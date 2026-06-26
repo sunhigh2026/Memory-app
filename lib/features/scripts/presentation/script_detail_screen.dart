@@ -297,8 +297,8 @@ class ScriptDetailScreen extends ConsumerWidget {
       ),
       child: ListTile(
         onTap: () {
-          Navigator.of(context).pop(); // ボトムシートを閉じる
           context.push('/practice/$scriptId/$level');
+          Navigator.of(context).pop(); // ボトムシートを閉じる
         },
         title: Row(
           children: [
@@ -416,8 +416,8 @@ class ScriptDetailScreen extends ConsumerWidget {
       ),
       child: ListTile(
         onTap: () {
-          Navigator.of(context).pop(); // ボトムシートを閉じる
           context.push('/voice-check/$scriptId/$level');
+          Navigator.of(context).pop(); // ボトムシートを閉じる
         },
         title: Row(
           children: [

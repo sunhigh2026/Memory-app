@@ -664,8 +664,8 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
 
         // 2. ひらがな（読み）の包含および曖昧一致チェック
         try {
-          final hiraText = await TextNormalizer.toHiragana(normalizedText);
-          final hiraCorrect = await TextNormalizer.toHiragana(normalizedCorrect);
+          final hiraText = await TextNormalizer.fullNormalize(text);
+          final hiraCorrect = await TextNormalizer.fullNormalize(correctWord);
           if (hiraText.isNotEmpty && hiraCorrect.isNotEmpty) {
             // 包含・曖昧一致チェック
             if (hiraText.contains(hiraCorrect) || TextNormalizer.isFuzzyMatch(hiraText, hiraCorrect)) {
@@ -775,8 +775,8 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
     if (!isCorrect) {
       // ひらがな読み曖昧比較
       try {
-        final hiraAnswer = await TextNormalizer.toHiragana(normalizedAnswer);
-        final hiraCorrect = await TextNormalizer.toHiragana(normalizedCorrect);
+        final hiraAnswer = await TextNormalizer.fullNormalize(answer);
+        final hiraCorrect = await TextNormalizer.fullNormalize(correct);
         if (hiraAnswer.isNotEmpty && hiraCorrect.isNotEmpty) {
           isCorrect = hiraAnswer == hiraCorrect ||
               TextNormalizer.isFuzzyMatch(hiraAnswer, hiraCorrect);

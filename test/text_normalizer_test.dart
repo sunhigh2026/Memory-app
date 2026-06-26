@@ -87,5 +87,14 @@ void main() {
       final hira = await TextNormalizer.toHiragana('負債');
       expect(hira, 'ふさい');
     });
+
+    test('ゼロ幅スペースやBOMなどの不可視文字が除去されること', () {
+      expect(TextNormalizer.normalize('負\u200B債\u200Cが\u200Dぎ\uFEFFぐげご'), '負債がぎぐげご');
+    });
+
+    test('fullNormalizeがカタカナ混じり漢字テキストを正しくひらがな化できること', () async {
+      final norm = await TextNormalizer.fullNormalize('パソコン監査');
+      expect(norm, 'ぱそこんかんさ');
+    });
   });
 }

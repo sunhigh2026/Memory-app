@@ -1,4 +1,3 @@
-import 'package:jp_transliterate/jp_transliterate.dart';
 import 'package:unorm_dart/unorm_dart.dart' as unorm;
 import 'package:kuromoji/kuromoji.dart' as kuro;
 import 'package:kuromoji/src/tokenizer.dart' as kuro_tok;
@@ -14,11 +13,11 @@ class TextNormalizer {
     String text, {
     ParenthesesMode parentheses = ParenthesesMode.keep,
   }) {
-    var result = unorm.nfc(text);
+    var result = unorm.nfc(text.trim());
     // 括弧処理
     result = handleParentheses(result, parentheses);
-    // 句読点・空白・改行、および丸数字や中黒、ダッシュ、数字等の記号を除去
-    result = result.replaceAll(RegExp(r'[。、！？!?,.\s\n\r　・①-⑳㉑-㊿\d０-９\-‐―—]'), '');
+    // 句読点・空白・改行、および丸数字や中黒、ダッシュ、数字等の記号、不可視制御文字を除去
+    result = result.replaceAll(RegExp(r'[。、！？!?,.\s\n\r　・①-⑳㉑-㊿\d０-９\-‐―—\u200B-\u200D\uFEFF]'), '');
     // 全角英数字を半角に変換
     result = _fullWidthToHalfWidth(result);
     // 小文字に統一
@@ -66,9 +65,9 @@ class TextNormalizer {
     String text, {
     ParenthesesMode parentheses = ParenthesesMode.keep,
   }) async {
-    var result = unorm.nfc(text);
+    var result = unorm.nfc(text.trim());
     result = handleParentheses(result, parentheses);
-    result = result.replaceAll(RegExp(r'[。、！？!?,.\s\n\r　・①-⑳㉑-㊿\d０-９\-‐―—]'), '');
+    result = result.replaceAll(RegExp(r'[。、！？!?,.\s\n\r　・①-⑳㉑-㊿\d０-９\-‐―—\u200B-\u200D\uFEFF]'), '');
     result = _fullWidthToHalfWidth(result);
     result = result.toLowerCase();
     result = await toHiragana(result);
