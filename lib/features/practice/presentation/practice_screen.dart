@@ -9,6 +9,7 @@ import '../../../core/widgets/rank_chip.dart';
 import '../data/cloze_generator.dart';
 import '../../scripts/data/scripts_repository.dart';
 import '../../voice_check/data/speech_recognition_service.dart';
+import '../../voice_check/data/speech_engine_type.dart';
 import '../../voice_check/domain/recognition_mode.dart';
 import '../../../models/script.dart';
 import '../../../models/cloze_word.dart';
@@ -78,11 +79,6 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
       TweenSequenceItem(tween: Tween(begin: 1.04, end: 1.0), weight: 50),
     ]).animate(
         CurvedAnimation(parent: _scaleCtrl, curve: Curves.elasticOut));
-
-    // マイク常時起動（ウォーム）: initState後に非同期で実行する
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _warmUpMic();
-    });
   }
 
 
@@ -134,16 +130,6 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
     _scaleCtrl.dispose();
     super.dispose();
   }
-
-  /// ウォームアップ: センスボイスの場合はマイクを常時起動
-  Future<void> _warmUpMic() async {
-    if (!mounted) return;
-    final speechService = ref.read(speechRecognitionServiceProvider);
-    final available = await speechService.initialize();
-    if (!available) return;
-    await speechService.warmUp();
-  }
-
   /// クールダウン: 画面退出時にマイクを停止
   void _coolDownMic() {
     final speechService = ref.read(speechRecognitionServiceProvider);
@@ -515,8 +501,10 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
                   // 結果表示中なら、前の音声認識セッションの終了を安全に待つ
                   await _stopVoiceInput();
                   // 次の問題へ進んで自動でマイク入力を開始するように設定
+                  final engineType = ref.read(speechEngineTypeProvider);
+                  final isSenseVoice = engineType == SpeechEngineType.sherpaOnnx;
                   setState(() {
-                    _autoStartVoiceForNext = true;
+                    _autoStartVoiceForNext = !isSenseVoice;
                   });
                   _next();
                 } else {
@@ -640,9 +628,12 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
       return;
     }
 
+    final engineType = ref.read(speechEngineTypeProvider);
+    final isSenseVoice = engineType == SpeechEngineType.sherpaOnnx;
+
     setState(() {
       _isListeningVoiceInput = true;
-      _autoStartVoiceForNext = true;
+      _autoStartVoiceForNext = !isSenseVoice;
       _inputController.text = '';
     });
 

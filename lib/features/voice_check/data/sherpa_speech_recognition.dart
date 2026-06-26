@@ -120,66 +120,15 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
   /// 録音開始時のラグをゼロにする。音声はリングバッファに蓄積するのみで認識はしない。
   @override
   Future<void> warmUp() async {
-    if (_isWarmedUp || _isListening) return;
-    if (_recognizer == null) return;
-
-    // ignore: avoid_print
-    print('【音声認識】ウォームアップ開始: マイク常時起動');
-
-    try {
-      final audioStream = await _audioRecorder.startStream(
-        const RecordConfig(
-          encoder: AudioEncoder.pcm16bits,
-          sampleRate: _sampleRate,
-          numChannels: 1,
-          autoGain: true,
-          echoCancel: false,
-          noiseSuppress: false,
-        ),
-      );
-
-      _isWarmedUp = true;
-      _ringBuffer.clear();
-
-      _audioSubscription = audioStream.listen(
-        (data) {
-          if (!_isWarmedUp) return;
-          final samples = _bytesToFloat32(Uint8List.fromList(data));
-
-          if (_isListening) {
-            // 認識中は通常の音声処理パイプラインへ
-            _processAudioChunk(samples);
-          } else {
-            // 待機中はリングバッファに直近300ms分だけ保持
-            _ringBuffer.addAll(samples);
-            while (_ringBuffer.length > _prePadSamples) {
-              _ringBuffer.removeFirst();
-            }
-          }
-        },
-        onError: (error) {
-          _onError?.call('音声取得エラー: $error');
-        },
-      );
-
-      // ignore: avoid_print
-      print('【音声認識】ウォームアップ完了: マイクストリーム確立');
-    } catch (e) {
-      _isWarmedUp = false;
-      // ignore: avoid_print
-      print('【音声認識】ウォームアップ失敗: $e');
-    }
+    // センスボイスのマイク常時接続を廃止するため、no-op化
+    _isWarmedUp = false;
   }
 
   /// ウォーム状態を解除してマイクストリームを完全に停止する。
   /// 練習画面から離脱するタイミングで呼び出す。
   @override
   Future<void> coolDown() async {
-    if (!_isWarmedUp) return;
-
-    // ignore: avoid_print
-    print('【音声認識】クールダウン: マイクストリームを停止');
-
+    // センスボイスのマイク常時接続を廃止するため、no-op化
     _isWarmedUp = false;
     _isListening = false;
     _stopping = false;
