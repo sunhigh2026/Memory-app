@@ -2,6 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:memorization_app/core/utils/text_normalizer.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('TextNormalizer.levenshtein', () {
     test('同じ文字列の距離は0', () {
       expect(TextNormalizer.levenshtein('あいうえお', 'あいうえお'), 0);
@@ -79,6 +81,11 @@ void main() {
       final nfcText = 'がぎぐげご';
       final nfdText = 'か\u3099き\u3099く\u3099け\u3099こ\u3099';
       expect(TextNormalizer.normalize(nfcText) == TextNormalizer.normalize(nfdText), isTrue);
+    });
+
+    test('toHiraganaが漢字を正しくひらがなに変換できること', () async {
+      final hira = await TextNormalizer.toHiragana('負債');
+      expect(hira, 'ふさい');
     });
   });
 }

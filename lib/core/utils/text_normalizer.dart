@@ -1,5 +1,7 @@
 import 'package:jp_transliterate/jp_transliterate.dart';
 import 'package:unorm_dart/unorm_dart.dart' as unorm;
+import 'package:kuromoji/kuromoji.dart' as kuro;
+import 'package:kuromoji/src/tokenizer.dart' as kuro_tok;
 
 /// 括弧の扱い
 enum ParenthesesMode { keep, stripContent, stripSymbols }
@@ -19,18 +21,41 @@ class TextNormalizer {
     result = result.replaceAll(RegExp(r'[。、！？!?,.\s\n\r　・①-⑳㉑-㊿\d０-９\-‐―—]'), '');
     // 全角英数字を半角に変換
     result = _fullWidthToHalfWidth(result);
+    // 小文字に統一
+    result = result.toLowerCase();
     // カタカナをひらがなに変換
     result = katakanaToHiragana(result);
     return result;
   }
 
+  static kuro_tok.Tokenizer? _kuromojiTokenizer;
+
+  static Future<kuro_tok.Tokenizer> _getTokenizer() async {
+    if (_kuromojiTokenizer != null) return _kuromojiTokenizer!;
+    _kuromojiTokenizer = await kuro.TokenizerBuilder().build();
+    return _kuromojiTokenizer!;
+  }
+
   /// 漢字混じりテキスト → ひらがな変換
-  /// jp_transliterate を使用。失敗時はカタカナ→ひらがなフォールバック。
+  /// ピュアDartのkuromojiを使用し、オフライン・クロスプラットフォームで安定して動作します。
   static Future<String> toHiragana(String text) async {
+    if (text.isEmpty) return '';
     try {
-      final data = await JpTransliterate.transliterate(kanji: text);
-      return data.hiragana;
-    } catch (_) {
+      final tokenizer = await _getTokenizer();
+      final tokens = tokenizer.tokenize(text);
+      final buffer = StringBuffer();
+      for (final token in tokens) {
+        final reading = token['reading'] as String?;
+        if (reading == null || reading == '*' || reading.isEmpty) {
+          buffer.write(token['surface_form'] as String? ?? '');
+        } else {
+          buffer.write(katakanaToHiragana(reading));
+        }
+      }
+      return buffer.toString();
+    } catch (e) {
+      // ignore: avoid_print
+      print('【デバッグ】toHiraganaエラー: $e');
       // オフライン時やAPI失敗時のフォールバック
       return katakanaToHiragana(text);
     }
@@ -45,6 +70,7 @@ class TextNormalizer {
     result = handleParentheses(result, parentheses);
     result = result.replaceAll(RegExp(r'[。、！？!?,.\s\n\r　・①-⑳㉑-㊿\d０-９\-‐―—]'), '');
     result = _fullWidthToHalfWidth(result);
+    result = result.toLowerCase();
     result = await toHiragana(result);
     // toHiragana後にカタカナが残る場合もあるので二重変換
     result = katakanaToHiragana(result);
