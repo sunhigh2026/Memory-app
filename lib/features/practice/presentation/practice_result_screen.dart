@@ -314,7 +314,7 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
                                     '/practice/${widget.scriptId}/$nextLevel');
                               }
                             },
-                             child: Text(passed ? '次のレベル（レベル${widget.level + 1}）へ' : 'もう一度'),
+                             child: Text(passed ? '次のレベル（Lv.${widget.level + 1}）へ' : 'もう一度'),
                           ),
                         ),
                       ],

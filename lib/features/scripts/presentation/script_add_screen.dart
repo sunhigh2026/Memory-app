@@ -235,11 +235,47 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
                   vertical: 10,
                 ),
               ),
-              items: const [
-                DropdownMenuItem(value: 'S', child: Text('S (頻度: 非常に入念)')),
-                DropdownMenuItem(value: 'A', child: Text('A (頻度: 高)')),
-                DropdownMenuItem(value: 'B', child: Text('B (頻度: 普通)')),
-                DropdownMenuItem(value: 'C', child: Text('C (頻度: 低)')),
+              items: [
+                DropdownMenuItem(
+                  value: 'S',
+                  child: Text(
+                    'S (頻度: 非常に入念)',
+                    style: TextStyle(
+                      color: const Color(0xFFD4AF37),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                DropdownMenuItem(
+                  value: 'A',
+                  child: Text(
+                    'A (頻度: 高)',
+                    style: TextStyle(
+                      color: AppTheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                DropdownMenuItem(
+                  value: 'B',
+                  child: Text(
+                    'B (頻度: 普通)',
+                    style: TextStyle(
+                      color: AppTheme.secondary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                DropdownMenuItem(
+                  value: 'C',
+                  child: Text(
+                    'C (頻度: 低)',
+                    style: TextStyle(
+                      color: AppTheme.grey500,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               ],
               onChanged: (value) {
                 if (value != null) {

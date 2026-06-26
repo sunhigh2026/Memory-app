@@ -783,6 +783,10 @@ class _ReviewDueCard extends StatelessWidget {
                       maxLines: 1,
                     ),
                   ),
+                  if (script.rank.isNotEmpty) ...[
+                    _buildMiniRankBadge(script.rank),
+                    const SizedBox(width: 4),
+                  ],
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 6, vertical: 2),
@@ -851,6 +855,40 @@ class _ReviewDueCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMiniRankBadge(String rank) {
+    Color color;
+    switch (rank) {
+      case 'S':
+        color = const Color(0xFFD4AF37); // ゴールド
+        break;
+      case 'A':
+        color = AppTheme.primary; // インディゴ
+        break;
+      case 'B':
+        color = AppTheme.secondary; // ティール
+        break;
+      case 'C':
+      default:
+        color = AppTheme.grey500; // グレー
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppTheme.radiusSm / 2),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 0.8),
+      ),
+      child: Text(
+        rank,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );
@@ -1124,10 +1162,33 @@ class _MultiSelectDropdownState<T> extends State<_MultiSelectDropdown<T>> {
                   const Divider(height: 1),
                   ...widget.items.map((item) {
                     final isChecked = tempSelected.contains(item);
+                    Color textColor = AppTheme.textDark;
+                    FontWeight fontWeight = FontWeight.normal;
+                    if (item is String && ['S', 'A', 'B', 'C'].contains(item)) {
+                      fontWeight = FontWeight.bold;
+                      switch (item) {
+                        case 'S':
+                          textColor = const Color(0xFFD4AF37);
+                          break;
+                        case 'A':
+                          textColor = AppTheme.primary;
+                          break;
+                        case 'B':
+                          textColor = AppTheme.secondary;
+                          break;
+                        case 'C':
+                          textColor = AppTheme.grey500;
+                          break;
+                      }
+                    }
                     return CheckboxListTile(
                       title: Text(
                         widget.itemLabelBuilder(item),
-                        style: const TextStyle(fontSize: 14, color: AppTheme.textDark),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: textColor,
+                          fontWeight: fontWeight,
+                        ),
                       ),
                       value: isChecked,
                       onChanged: (checked) {

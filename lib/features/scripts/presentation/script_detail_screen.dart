@@ -526,11 +526,47 @@ class _TargetDateSectionState extends ConsumerState<_TargetDateSection> {
               ),
               const SizedBox(height: 8),
               SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'S', label: Text('S')),
-                  ButtonSegment(value: 'A', label: Text('A')),
-                  ButtonSegment(value: 'B', label: Text('B')),
-                  ButtonSegment(value: 'C', label: Text('C')),
+                segments: [
+                  ButtonSegment(
+                    value: 'S',
+                    label: Text(
+                      'S',
+                      style: TextStyle(
+                        color: const Color(0xFFD4AF37),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  ButtonSegment(
+                    value: 'A',
+                    label: Text(
+                      'A',
+                      style: TextStyle(
+                        color: AppTheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  ButtonSegment(
+                    value: 'B',
+                    label: Text(
+                      'B',
+                      style: TextStyle(
+                        color: AppTheme.secondary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  ButtonSegment(
+                    value: 'C',
+                    label: Text(
+                      'C',
+                      style: TextStyle(
+                        color: AppTheme.grey500,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
                 ],
                 selected: {script.rank},
                 onSelectionChanged: (newSelection) async {

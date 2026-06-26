@@ -821,7 +821,7 @@ class _VoiceCheckScreenState extends ConsumerState<VoiceCheckScreen>
                           }
                         },
                         child: Text((result.similarityScore >= 80 && widget.level < 8)
-                            ? '次のレベル（レベル${widget.level + 1}）へ'
+                            ? '次のレベル（Lv.${widget.level + 1}）へ'
                             : 'もう一度挑戦'),
                       ),
                     ),
