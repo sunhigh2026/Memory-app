@@ -221,15 +221,9 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
     print('【音声認識】認識開始: $mode, ウォーム状態: $_isWarmedUp');
 
     if (_isWarmedUp) {
-      // ウォーム状態: マイクは既に起動済み。プリパディングをバッファに適用してすぐ開始
-      final prePad = List<double>.from(_ringBuffer);
-      _audioBuffer.addAll(prePad);
-      // VADにも先読みデータを流す
-      if (prePad.isNotEmpty) {
-        _vad?.acceptWaveform(Float32List.fromList(prePad));
-      }
-      // ignore: avoid_print
-      print('【音声認識】プリパディング適用: ${prePad.length}サンプル (${(prePad.length / _sampleRate * 1000).toInt()}ms)');
+      // ウォーム状態: マイクは既に起動済み。ボタンタップ前のノイズ（タップ音など）混入を防ぐため、
+      // プリパディング（先読み）は適用せず、バッファをクリアしてタップした瞬間から開始します。
+      _ringBuffer.clear();
 
       // 起動ラグがないため即座に通知（コールバックが設定されている場合のみ）
       onListeningStarted?.call();
