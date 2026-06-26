@@ -84,7 +84,7 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
           // silero_vad モデルは sherpa-onnx に内蔵
           model: '$modelDir/silero_vad.onnx',
           threshold: 0.5,
-          minSilenceDuration: 0.5,
+          minSilenceDuration: 0.3,
           minSpeechDuration: 0.25,
           maxSpeechDuration: 30.0,
         ),

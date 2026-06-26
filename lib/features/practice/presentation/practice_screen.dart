@@ -603,7 +603,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
       mode: RecognitionMode.immediate,
       listenFor: const Duration(seconds: 10), // 短い時間で十分
       onListeningStarted: () {
-        HapticFeedback.mediumImpact();
+        HapticFeedback.vibrate();
       },
       onResult: (text) {
         if (!mounted) return;
