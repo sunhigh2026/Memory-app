@@ -27,7 +27,6 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
   Function(String)? _onResult;
   Function(String)? _onPartialResult;
   Function(String)? _onError;
-  Function()? _onListeningStarted;
 
   // 音声バッファ（VADセグメント用）
   final List<double> _audioBuffer = [];
@@ -125,7 +124,6 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
     _audioBuffer.clear();
     _onResult = onResult;
     _onPartialResult = onPartialResult;
-    _onListeningStarted = onListeningStarted;
     _onError = onError;
 
     // デバッグ状態初期化
@@ -136,15 +134,22 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
     print('【音声認識】録音開始要求: $mode, 設定: 16kHz Mono');
 
     try {
+      // 先に振動などの準備完了通知を呼び出し、振動のノイズが収まるのを待つ
+      onListeningStarted?.call();
+      await Future.delayed(const Duration(milliseconds: 250));
+
+      if (!_isListening) return; // 待機中に停止された場合の安全策
+
       // 音声ストリームを開始（PCM 16bit, 16kHz, mono）
+      // ノイズ抑制やエコー除去が話し始めの音声を切り落とす原因になるため false に設定
       final audioStream = await _audioRecorder.startStream(
         const RecordConfig(
           encoder: AudioEncoder.pcm16bits,
           sampleRate: _sampleRate,
           numChannels: 1,
           autoGain: true,
-          echoCancel: true,
-          noiseSuppress: true,
+          echoCancel: false,
+          noiseSuppress: false,
         ),
       );
 
@@ -169,10 +174,6 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
       final elapsed = DateTime.now().difference(_recordingStartTime!);
       // ignore: avoid_print
       print('【音声認識】最初の音声チャンク受信完了: ${elapsed.inMilliseconds}ms');
-      
-      // 最初の音声チャンクが届いた（確実に録音が開始された）タイミングで振動を通知
-      _onListeningStarted?.call();
-      _onListeningStarted = null;
     }
 
     _totalSamplesReceived += bytes.length ~/ 2; // pcm16bits なので 2bytes = 1sample
