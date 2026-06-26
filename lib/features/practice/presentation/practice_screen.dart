@@ -640,11 +640,24 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
       listenFor: const Duration(seconds: 10), // 短い時間で十分
       onResult: (text) {
         if (!mounted) return;
+        
+        // 最終結果（text）と画面上のテキスト（_inputController.text）のうち、
+        // 文字数が長い（より完全である）方を最終判定テキストとして採用します。
+        String finalAnswer = text;
+        final currentText = _inputController.text.trim();
+        if (currentText.length > text.length) {
+          finalAnswer = currentText;
+        } else {
+          setState(() {
+            _inputController.text = text;
+          });
+        }
+
         setState(() {
           _isListeningVoiceInput = false;
-          _inputController.text = text;
         });
-        _checkAnswer(text, correctWord);
+        
+        _checkAnswer(finalAnswer, correctWord);
       },
       onPartialResult: (text) async {
         if (!mounted) return;

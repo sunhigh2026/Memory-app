@@ -279,10 +279,10 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
       _onPartialResult?.call('$_accumulatedText...');
     }
 
-    // 無音自動停止の監視 (即時中断モードのみ適用)
-    if (_currentMode == RecognitionMode.immediate && !_stopping) {
-      _checkSilenceAndAutoStop(samples);
-    }
+    // 無音自動停止の監視 (手動トグル停止に統一するため廃止)
+    // if (_currentMode == RecognitionMode.immediate && !_stopping) {
+    //   _checkSilenceAndAutoStop(samples);
+    // }
   }
 
   /// 音声のRMS（音量）を計算し、無音による自動停止を判定する

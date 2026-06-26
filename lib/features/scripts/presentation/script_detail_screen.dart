@@ -297,8 +297,9 @@ class ScriptDetailScreen extends ConsumerWidget {
       ),
       child: ListTile(
         onTap: () {
-          context.push('/practice/$scriptId/$level');
+          final router = GoRouter.of(context);
           Navigator.of(context).pop(); // ボトムシートを閉じる
+          router.push('/practice/$scriptId/$level');
         },
         title: Row(
           children: [
@@ -416,8 +417,9 @@ class ScriptDetailScreen extends ConsumerWidget {
       ),
       child: ListTile(
         onTap: () {
-          context.push('/voice-check/$scriptId/$level');
+          final router = GoRouter.of(context);
           Navigator.of(context).pop(); // ボトムシートを閉じる
+          router.push('/voice-check/$scriptId/$level');
         },
         title: Row(
           children: [
