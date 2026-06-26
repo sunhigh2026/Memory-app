@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -476,15 +477,21 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
           children: [
             GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: _showingResult
-                  ? null
-                  : () {
-                      if (_isListeningVoiceInput) {
-                        _stopVoiceInput();
-                      } else {
-                        _startVoiceInput(target.word);
-                      }
-                    },
+              onTapDown: (_) async {
+                if (_showingResult) {
+                  // 結果表示中なら、次の問題へ進んでから音声入力を開始
+                  _next();
+                  await Future.delayed(const Duration(milliseconds: 150));
+                  if (mounted) {
+                    final nextTarget = _clozeWords[_currentIndex];
+                    _startVoiceInput(nextTarget.word);
+                  }
+                } else {
+                  _startVoiceInput(target.word);
+                }
+              },
+              onTapUp: (_) => _stopVoiceInput(),
+              onTapCancel: () => _stopVoiceInput(),
               child: Container(
                 width: 48,
                 height: 48,
@@ -593,6 +600,9 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
     await speechService.startListening(
       mode: RecognitionMode.immediate,
       listenFor: const Duration(seconds: 10), // 短い時間で十分
+      onListeningStarted: () {
+        HapticFeedback.mediumImpact();
+      },
       onResult: (text) {
         if (!mounted) return;
         setState(() {
