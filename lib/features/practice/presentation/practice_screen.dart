@@ -501,7 +501,9 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
               behavior: HitTestBehavior.opaque,
               onTap: () async {
                 if (_showingResult) {
-                  // 結果表示中なら、次の問題へ進んで自動でマイク入力を開始するように設定
+                  // 結果表示中なら、前の音声認識セッションの終了を安全に待つ
+                  await _stopVoiceInput();
+                  // 次の問題へ進んで自動でマイク入力を開始するように設定
                   setState(() {
                     _autoStartVoiceForNext = true;
                   });
@@ -511,7 +513,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
                     setState(() {
                       _autoStartVoiceForNext = false; // 手動で止めた場合は次回の自動起動を無効化
                     });
-                    _stopVoiceInput();
+                    await _stopVoiceInput();
                   } else {
                     _startVoiceInput(target.word);
                   }
@@ -655,7 +657,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
 
         // 1. 完全一致・包含チェック (高速)
         if (normalizedText.contains(normalizedCorrect)) {
-          _stopVoiceInput();
+          await _stopVoiceInput();
           _checkAnswer(correctWord, correctWord); // 正解として送信
           return;
         }
@@ -667,7 +669,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
           if (hiraText.isNotEmpty && hiraCorrect.isNotEmpty) {
             // 包含・曖昧一致チェック
             if (hiraText.contains(hiraCorrect) || TextNormalizer.isFuzzyMatch(hiraText, hiraCorrect)) {
-              _stopVoiceInput();
+              await _stopVoiceInput();
               _checkAnswer(correctWord, correctWord); // 正解として送信
               return;
             }
@@ -678,7 +680,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
                 hiraCorrect.length >= 3 &&
                 hiraCorrect.endsWith(hiraText) &&
                 hiraText.length >= (hiraCorrect.length * 0.6).ceil()) {
-              _stopVoiceInput();
+              await _stopVoiceInput();
               _checkAnswer(correctWord, correctWord); // 正解として送信
               return;
             }
