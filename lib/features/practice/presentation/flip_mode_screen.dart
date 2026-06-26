@@ -59,27 +59,34 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
     final scripts = ref.read(scriptsListProvider);
     _script = scripts.firstWhere((s) => s.id == widget.scriptId);
 
-    // Level 2 の密度は20%
-    final density = ClozeGenerator.densityForLevel(2);
-    final pinned = _script.pinnedClozeWords;
-    _clozeWords = _generator.generate(
-      _script.content,
-      densityPercent: density,
-      pinnedClozeWords: pinned,
-    );
-
-    if (_clozeWords.isEmpty) {
+    if (widget.retryWords != null && widget.retryWords!.isNotEmpty) {
+      // 復習モード時は、間違えた単語のみを強制的に穴埋めにする
       _clozeWords = _generator.generate(
         _script.content,
-        densityPercent: 20,
-        pinnedClozeWords: pinned,
+        densityPercent: 100, // 密度100%（すべての間違えた単語を穴埋めにする）
+        pinnedClozeWords: widget.retryWords!, // 間違えた単語を優先ピン留め
       );
-    }
-
-    if (widget.retryWords != null && widget.retryWords!.isNotEmpty) {
+      // ピン留めされたもの（間違えた単語）だけを残す
       _clozeWords = _clozeWords
           .where((cw) => widget.retryWords!.contains(cw.word))
           .toList();
+    } else {
+      // Level 2 の密度は20%
+      final density = ClozeGenerator.densityForLevel(2);
+      final pinned = _script.pinnedClozeWords;
+      _clozeWords = _generator.generate(
+        _script.content,
+        densityPercent: density,
+        pinnedClozeWords: pinned,
+      );
+
+      if (_clozeWords.isEmpty) {
+        _clozeWords = _generator.generate(
+          _script.content,
+          densityPercent: 20,
+          pinnedClozeWords: pinned,
+        );
+      }
     }
 
     // 各空欄の状態を初期化

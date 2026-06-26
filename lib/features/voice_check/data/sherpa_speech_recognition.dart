@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:record/record.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
@@ -19,6 +20,16 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
   bool _stopping = false;
   String _accumulatedText = '';
   RecognitionMode _currentMode = RecognitionMode.fullRecitation;
+
+  // 無音自動停止用の状態変数
+  bool _hasSpeechStarted = false;
+  int _silenceSamplesCount = 0;
+
+  // しきい値設定
+  static const double _speechVolumeThreshold = 0.015; // 発話開始とみなすRMSしきい値
+  static const double _silenceVolumeThreshold = 0.010; // 無音とみなすRMSしきい値
+  static const int _silenceDurationSamples = 11200; // 700msの無音 @ 16kHz (0.7 * 16000)
+
 
   // コールバック
   Function(String)? _onResult;
@@ -203,6 +214,8 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
     _onResult = onResult;
     _onPartialResult = onPartialResult;
     _onError = onError;
+    _hasSpeechStarted = false;
+    _silenceSamplesCount = 0;
 
     // ignore: avoid_print
     print('【音声認識】認識開始: $mode, ウォーム状態: $_isWarmedUp');
@@ -270,6 +283,44 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
     // 録音中は「認識中」を表示
     if (_accumulatedText.isNotEmpty) {
       _onPartialResult?.call('$_accumulatedText...');
+    }
+
+    // 無音自動停止の監視 (即時中断モードのみ適用)
+    if (_currentMode == RecognitionMode.immediate && !_stopping) {
+      _checkSilenceAndAutoStop(samples);
+    }
+  }
+
+  /// 音声のRMS（音量）を計算し、無音による自動停止を判定する
+  void _checkSilenceAndAutoStop(Float32List samples) {
+    if (samples.isEmpty) return;
+
+    double sum = 0.0;
+    for (int i = 0; i < samples.length; i++) {
+      sum += samples[i] * samples[i];
+    }
+    final double volume = math.sqrt(sum / samples.length);
+
+    if (!_hasSpeechStarted) {
+      if (volume >= _speechVolumeThreshold) {
+        _hasSpeechStarted = true;
+        _silenceSamplesCount = 0;
+        // ignore: avoid_print
+        print('【音声認識】発話を検知しました (RMS: ${volume.toStringAsFixed(4)})');
+      }
+    } else {
+      if (volume < _silenceVolumeThreshold) {
+        _silenceSamplesCount += samples.length;
+        if (_silenceSamplesCount >= _silenceDurationSamples) {
+          // ignore: avoid_print
+          print('【音声認識】自動停止トリガー: 無音検知 (${(_silenceSamplesCount / _sampleRate * 1000).toInt()}ms 継続)');
+          
+          // 非同期で音声認識停止を実行
+          Future.microtask(() => stopListening());
+        }
+      } else {
+        _silenceSamplesCount = 0; // 発話が継続しているので無音カウントリセット
+      }
     }
   }
 

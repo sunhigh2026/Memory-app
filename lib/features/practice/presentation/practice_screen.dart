@@ -43,6 +43,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
   bool _isListeningVoiceInput = false;
   final _inputController = TextEditingController();
   final _generator = ClozeGenerator();
+  bool _autoStartVoiceForNext = false;
 
   List<String> _currentChoices = [];
   String _selectedChoice = '';
@@ -500,15 +501,16 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
               behavior: HitTestBehavior.opaque,
               onTap: () async {
                 if (_showingResult) {
-                  // 結果表示中なら、次の問題へ進んでから音声入力を開始
+                  // 結果表示中なら、次の問題へ進んで自動でマイク入力を開始するように設定
+                  setState(() {
+                    _autoStartVoiceForNext = true;
+                  });
                   _next();
-                  await Future.delayed(const Duration(milliseconds: 150));
-                  if (mounted) {
-                    final nextTarget = _clozeWords[_currentIndex];
-                    _startVoiceInput(nextTarget.word);
-                  }
                 } else {
                   if (_isListeningVoiceInput) {
+                    setState(() {
+                      _autoStartVoiceForNext = false; // 手動で止めた場合は次回の自動起動を無効化
+                    });
                     _stopVoiceInput();
                   } else {
                     _startVoiceInput(target.word);
@@ -561,7 +563,12 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
                     icon: const Icon(Icons.send),
                     onPressed: _showingResult
                         ? null
-                        : () => _checkAnswer(_inputController.text.trim(), target.word),
+                        : () {
+                            setState(() {
+                              _autoStartVoiceForNext = false; // 手動入力時は次回の自動マイク起動を無効化
+                            });
+                            _checkAnswer(_inputController.text.trim(), target.word);
+                          },
                   ),
                   enabledBorder: borderColor != null
                       ? OutlineInputBorder(
@@ -584,7 +591,12 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
                 ),
                 onSubmitted: _showingResult
                     ? null
-                    : (value) => _checkAnswer(value.trim(), target.word),
+                    : (value) {
+                        setState(() {
+                          _autoStartVoiceForNext = false; // 手動入力時は次回の自動マイク起動を無効化
+                        });
+                        _checkAnswer(value.trim(), target.word);
+                      },
               ),
             ),
           ],
@@ -617,6 +629,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
 
     setState(() {
       _isListeningVoiceInput = true;
+      _autoStartVoiceForNext = true;
       _inputController.text = '';
     });
 
@@ -914,6 +927,16 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
 
       if (_clozeWords.isNotEmpty && widget.level == 1) {
         _generateCurrentChoices();
+      }
+
+      // レベル2以上（記述・音声入力）で、自動マイク起動が有効な場合、次の問題でマイクを起動
+      if (widget.level > 1 && _autoStartVoiceForNext) {
+        Future.delayed(const Duration(milliseconds: 350), () {
+          if (mounted && _autoStartVoiceForNext && !_showingResult) {
+            final nextTarget = _clozeWords[_currentIndex];
+            _startVoiceInput(nextTarget.word);
+          }
+        });
       }
     } else {
       _stopwatch.stop();
