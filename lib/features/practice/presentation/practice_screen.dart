@@ -657,8 +657,8 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
 
         // 1. 完全一致・包含チェック (高速)
         if (normalizedText.contains(normalizedCorrect)) {
+          _checkAnswer(correctWord, correctWord); // 先に正解状態を確定
           await _stopVoiceInput();
-          _checkAnswer(correctWord, correctWord); // 正解として送信
           return;
         }
 
@@ -669,8 +669,8 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
           if (hiraText.isNotEmpty && hiraCorrect.isNotEmpty) {
             // 包含・曖昧一致チェック
             if (hiraText.contains(hiraCorrect) || TextNormalizer.isFuzzyMatch(hiraText, hiraCorrect)) {
+              _checkAnswer(correctWord, correctWord); // 先に正解状態を確定
               await _stopVoiceInput();
-              _checkAnswer(correctWord, correctWord); // 正解として送信
               return;
             }
             // 3. 末尾一致チェック: 発話冒頭の欠落・同音異義語対策
@@ -680,8 +680,8 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
                 hiraCorrect.length >= 3 &&
                 hiraCorrect.endsWith(hiraText) &&
                 hiraText.length >= (hiraCorrect.length * 0.6).ceil()) {
+              _checkAnswer(correctWord, correctWord); // 先に正解状態を確定
               await _stopVoiceInput();
-              _checkAnswer(correctWord, correctWord); // 正解として送信
               return;
             }
           }
@@ -764,7 +764,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
 
   void _checkAnswer(String answer, String correct) async {
     if (answer.isEmpty) return;
-    if (_showingResult) return;
+    if (_showingResult || _lastAnswerCorrect != null || _isAutoTransitioning) return;
 
     final normalizedAnswer = TextNormalizer.normalize(answer);
     final normalizedCorrect = TextNormalizer.normalize(correct);

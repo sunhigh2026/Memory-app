@@ -28,7 +28,7 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
   // しきい値設定
   static const double _speechVolumeThreshold = 0.015; // 発話開始とみなすRMSしきい値
   static const double _silenceVolumeThreshold = 0.010; // 無音とみなすRMSしきい値
-  static const int _silenceDurationSamples = 11200; // 700msの無音 @ 16kHz (0.7 * 16000)
+  static const int _silenceDurationSamples = 19200; // 1.2秒の無音 @ 16kHz (1.2 * 16000)
 
 
   // コールバック
@@ -96,7 +96,7 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
           // silero_vad モデルは sherpa-onnx に内蔵
           model: '$modelDir/silero_vad.onnx',
           threshold: 0.4,
-          minSilenceDuration: 0.3,
+          minSilenceDuration: 0.8, // 0.3秒から0.8秒に延長（話の合間の途切れ防止）
           minSpeechDuration: 0.15,
           maxSpeechDuration: 30.0,
         ),
