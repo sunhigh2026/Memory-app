@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -111,6 +112,23 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
     // タップによる開示フロー廃止のため、何もしない
   }
 
+  void _toggleEvaluation(int index) {
+    if (index >= _clozeWords.length) return;
+    if (index >= _currentIndex) return;
+
+    HapticFeedback.lightImpact();
+    setState(() {
+      final currentEval = _evaluatedStates[index];
+      if (currentEval == EvaluationType.correct) {
+        _evaluatedStates[index] = EvaluationType.wrong;
+        _correctCount = (_correctCount - 1).clamp(0, _clozeWords.length);
+      } else {
+        _evaluatedStates[index] = EvaluationType.correct;
+        _correctCount = (_correctCount + 1).clamp(0, _clozeWords.length);
+      }
+    });
+  }
+
   void _evaluateCurrent(EvaluationType type) async {
     if (_currentIndex >= _clozeWords.length) return;
 
@@ -122,6 +140,33 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
         _correctCount++;
       }
       _currentIndex++;
+    });
+  }
+
+  bool get _hasMistakes => _evaluatedStates.values.any((type) =>
+      type == EvaluationType.ambiguous || type == EvaluationType.wrong);
+
+  void _retryMistakes() {
+    final mistakes = <ClozeWord>[];
+    for (int i = 0; i < _clozeWords.length; i++) {
+      final eval = _evaluatedStates[i];
+      if (eval == EvaluationType.ambiguous || eval == EvaluationType.wrong) {
+        mistakes.add(_clozeWords[i]);
+      }
+    }
+
+    if (mistakes.isEmpty) return;
+
+    setState(() {
+      _clozeWords = mistakes;
+      _currentIndex = 0;
+      _correctCount = 0;
+      _revealedStates.clear();
+      _evaluatedStates.clear();
+      for (int i = 0; i < _clozeWords.length; i++) {
+        _revealedStates[i] = false;
+        _evaluatedStates[i] = null;
+      }
     });
   }
 
@@ -209,7 +254,10 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
               }
             },
           ),
-          title: Text('${_script.sortOrder} ${_script.title} (Lv2)'),
+          title: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Text('${_script.sortOrder}. ${_script.title} (Lv.2)'),
+          ),
           actions: [
             Center(
               child: Padding(
@@ -383,26 +431,50 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
                           )
                         : Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 24),
-                            child: SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: _finishSession,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.primary,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_hasMistakes) ...[
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      onPressed: _retryMistakes,
+                                      icon: const Icon(Icons.replay),
+                                      label: const Text('自信ない・わからないを復習'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.orange,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(30),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                ],
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    onPressed: _finishSession,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.primary,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(30),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      '結果を表示',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                child: const Text(
-                                  '結果を表示',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
+                              ],
                             ),
                           ),
                   ),
@@ -438,9 +510,11 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
       String displayText;
       FontWeight fontWeight = FontWeight.bold;
       TextDecoration decoration = TextDecoration.underline;
+      TapGestureRecognizer? recognizer;
 
       if (i < _currentIndex) {
         // すでに評価済みの空欄
+        recognizer = TapGestureRecognizer()..onTap = () => _toggleEvaluation(i);
         if (evaluation == EvaluationType.correct) {
           holeColor = AppTheme.secondary.withValues(alpha: 0.7); // 覚えてる＝薄い緑
           displayText = cw.word;
@@ -475,6 +549,7 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
 
       spans.add(TextSpan(
         text: displayText,
+        recognizer: recognizer,
         style: TextStyle(
           fontSize: 18,
           height: 1.8,

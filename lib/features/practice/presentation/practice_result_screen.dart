@@ -398,9 +398,9 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
-            for (int lvl = 1; lvl <= 3; lvl++) ...[
+            for (int lvl = 1; lvl <= 4; lvl++) ...[
               _buildLevelOption(ctx, lvl, scriptId, currentLevel),
-              if (lvl < 3) const SizedBox(height: 8),
+              if (lvl < 4) const SizedBox(height: 8),
             ],
             const SizedBox(height: 16),
             OutlinedButton(
@@ -416,8 +416,9 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
   Widget _buildLevelOption(BuildContext sheetContext, int level, String scriptId, int currentLevel) {
     final labels = {
       1: 'Level 1: 4択',
-      2: 'Level 2: キーボード入力',
-      3: 'Level 3: 高難度',
+      2: 'Level 2: 高速フリック',
+      3: 'Level 3: キーボード入力',
+      4: 'Level 4: 高難度入力',
     };
     final isCurrent = level == currentLevel;
     return Container(
