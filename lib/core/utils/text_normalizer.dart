@@ -1,4 +1,5 @@
 import 'package:jp_transliterate/jp_transliterate.dart';
+import 'package:unorm_dart/unorm_dart.dart' as unorm;
 
 /// 括弧の扱い
 enum ParenthesesMode { keep, stripContent, stripSymbols }
@@ -11,7 +12,7 @@ class TextNormalizer {
     String text, {
     ParenthesesMode parentheses = ParenthesesMode.keep,
   }) {
-    var result = text;
+    var result = unorm.nfc(text);
     // 括弧処理
     result = handleParentheses(result, parentheses);
     // 句読点・空白・改行、および丸数字や中黒、ダッシュ、数字等の記号を除去
@@ -40,7 +41,7 @@ class TextNormalizer {
     String text, {
     ParenthesesMode parentheses = ParenthesesMode.keep,
   }) async {
-    var result = text;
+    var result = unorm.nfc(text);
     result = handleParentheses(result, parentheses);
     result = result.replaceAll(RegExp(r'[。、！？!?,.\s\n\r　・①-⑳㉑-㊿\d０-９\-‐―—]'), '');
     result = _fullWidthToHalfWidth(result);

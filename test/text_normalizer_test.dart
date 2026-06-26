@@ -74,5 +74,11 @@ void main() {
       expect(TextNormalizer.normalize('①費用・便益'), '費用便益');
       expect(TextNormalizer.normalize('①あ・い-う―え'), 'あいうえ');
     });
+
+    test('NFCとNFDの濁音文字列が正規化後に一致すること', () {
+      final nfcText = 'がぎぐげご';
+      final nfdText = 'か\u3099き\u3099く\u3099け\u3099こ\u3099';
+      expect(TextNormalizer.normalize(nfcText) == TextNormalizer.normalize(nfdText), isTrue);
+    });
   });
 }
