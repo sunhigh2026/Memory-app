@@ -30,6 +30,7 @@ class AppSettingsRepository {
   static const String _keyVadThreshold = 'vad_threshold';
   static const String _keyVadMinSilenceDuration = 'vad_min_silence_duration';
   static const String _keyVadSpeechPadMs = 'vad_speech_pad_ms';
+  static const String _keyMatchStrictness = 'match_strictness';
 
   // VAD初期値の定義（コメントで根拠を示す）
   // threshold: 0.40。0.50だと静かな部屋以外で小さな声を取りこぼし、0.30未満だとノイズを過剰検知するため、中間の0.40を初期値とする。
@@ -88,6 +89,14 @@ class AppSettingsRepository {
 
   Future<void> setVadSpeechPadMs(int value) async {
     await _box.put(_keyVadSpeechPadMs, value);
+  }
+
+  String getMatchStrictness() {
+    return _box.get(_keyMatchStrictness, defaultValue: 'normal') as String;
+  }
+
+  Future<void> setMatchStrictness(String value) async {
+    await _box.put(_keyMatchStrictness, value);
   }
 }
 
@@ -203,3 +212,22 @@ class VadSpeechPadMsNotifier extends StateNotifier<int> {
     state = value;
   }
 }
+
+/// 照合の厳しさ設定（'easy' | 'normal' | 'strict'）の状態プロバイダ
+final matchStrictnessProvider =
+    StateNotifierProvider<MatchStrictnessNotifier, String>((ref) {
+  final repo = ref.watch(appSettingsRepositoryProvider);
+  return MatchStrictnessNotifier(repo);
+});
+
+class MatchStrictnessNotifier extends StateNotifier<String> {
+  final AppSettingsRepository _repo;
+
+  MatchStrictnessNotifier(this._repo) : super(_repo.getMatchStrictness());
+
+  Future<void> setValue(String value) async {
+    await _repo.setMatchStrictness(value);
+    state = value;
+  }
+}
+

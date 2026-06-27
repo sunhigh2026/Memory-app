@@ -52,6 +52,36 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildStrictnessSelector(BuildContext context, WidgetRef ref) {
+    final currentStrictness = ref.watch(matchStrictnessProvider);
+    return SegmentedButton<String>(
+      segments: const [
+        ButtonSegment(
+          value: 'easy',
+          label: Text('やさしい'),
+          icon: Icon(Icons.sentiment_satisfied_alt, size: 16),
+        ),
+        ButtonSegment(
+          value: 'normal',
+          label: Text('ふつう'),
+          icon: Icon(Icons.sentiment_neutral, size: 16),
+        ),
+        ButtonSegment(
+          value: 'strict',
+          label: Text('きびしい'),
+          icon: Icon(Icons.gavel, size: 16),
+        ),
+      ],
+      selected: {currentStrictness},
+      onSelectionChanged: (newSelection) {
+        ref.read(matchStrictnessProvider.notifier).setValue(newSelection.first);
+      },
+      style: const ButtonStyle(
+        textStyle: WidgetStatePropertyAll(TextStyle(fontSize: 13)),
+      ),
+    );
+  }
+
   Widget _buildModelManagementTile(BuildContext context, WidgetRef ref) {
     final downloadInfo = ref.watch(modelDownloadStateProvider);
     final isDownloaded =
@@ -352,6 +382,15 @@ class SettingsScreen extends ConsumerWidget {
                 Text(
                   '音声認識の特性上、正しく発音しても異なる漢字で表示される場合があります。'
                   'ひらがなに変換して比較することで、同音異義語の影響を軽減しています。',
+                  style: TextStyle(fontSize: 12, color: AppTheme.grey500),
+                ),
+                const Divider(height: 32),
+                const Text('照合の厳しさ', style: TextStyle(fontSize: 16)),
+                const SizedBox(height: 8),
+                _buildStrictnessSelector(context, ref),
+                const SizedBox(height: 8),
+                Text(
+                  '「きびしい」は一字一句正確な暗記向け、「やさしい」は多少の言い淀みや誤認識を許容します。',
                   style: TextStyle(fontSize: 12, color: AppTheme.grey500),
                 ),
               ],

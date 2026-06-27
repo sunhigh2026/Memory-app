@@ -5,9 +5,51 @@ import 'package:kuromoji/src/tokenizer.dart' as kuro_tok;
 /// 括弧の扱い
 enum ParenthesesMode { keep, stripContent, stripSymbols }
 
+/// 照合の厳しさ設定用のコンフィグ
+class MatchStrictnessConfig {
+  final double ratio; // 一定文字数以上の許容割合
+  final int shortLengthLimit; // 完全一致を求める文字数のしきい値
+  final int mediumLengthLimit; // 1文字だけ許容する文字数のしきい値
+  final int shortMaxDistance;
+  final int mediumMaxDistance;
+
+  const MatchStrictnessConfig({
+    required this.ratio,
+    required this.shortLengthLimit,
+    required this.mediumLengthLimit,
+    this.shortMaxDistance = 0,
+    this.mediumMaxDistance = 1,
+  });
+}
+
 /// テキスト正規化ユーティリティ
 /// 音声認識結果と原文の比較前に正規化処理を行う
 class TextNormalizer {
+  // 各厳しさの定義
+  static const Map<String, MatchStrictnessConfig> strictnessConfigs = {
+    'easy': MatchStrictnessConfig(
+      ratio: 0.30,
+      shortLengthLimit: 1, // 1文字以下は完全一致
+      mediumLengthLimit: 5, // 2〜5文字は2文字許容
+      shortMaxDistance: 0,
+      mediumMaxDistance: 2,
+    ),
+    'normal': MatchStrictnessConfig(
+      ratio: 0.20,
+      shortLengthLimit: 3, // 3文字以下は完全一致
+      mediumLengthLimit: 6, // 4〜6文字は1文字許容
+      shortMaxDistance: 0,
+      mediumMaxDistance: 1,
+    ),
+    'strict': MatchStrictnessConfig(
+      ratio: 0.10,
+      shortLengthLimit: 5, // 5文字以下は完全一致
+      mediumLengthLimit: 10, // 6〜10文字は1文字許容
+      shortMaxDistance: 0,
+      mediumMaxDistance: 1,
+    ),
+  };
+
   /// 比較用に正規化（句読点除去、全角→半角、カタカナ→ひらがな）
   static String normalize(
     String text, {
@@ -16,8 +58,8 @@ class TextNormalizer {
     var result = unorm.nfc(text.trim());
     // 括弧処理
     result = handleParentheses(result, parentheses);
-    // 句読点・空白・改行、および丸数字や中黒、ダッシュ、数字等の記号、不可視制御文字を除去
-    result = result.replaceAll(RegExp(r'[。、！？!?,.\s\n\r　・①-⑳㉑-㊿\d０-９\-‐―—\u200B-\u200D\uFEFF]'), '');
+    // 句読点・空白・改行、および丸数字や中黒、ダッシュ、数字等の記号、カッコ類、引用符、不可視制御文字を除去
+    result = result.replaceAll(RegExp(r"""[。、！？!?,.\s\n\r　・①-⑳㉑-㊿\d０-９\-‐―—\u200B-\u200D\uFEFF「」『』【】〔〕〈〉《》［］｛｝＜＞\[\]{}<>""''`’]"""), '');
     // 全角英数字を半角に変換
     result = _fullWidthToHalfWidth(result);
     // 小文字に統一
@@ -67,7 +109,7 @@ class TextNormalizer {
   }) async {
     var result = unorm.nfc(text.trim());
     result = handleParentheses(result, parentheses);
-    result = result.replaceAll(RegExp(r'[。、！？!?,.\s\n\r　・①-⑳㉑-㊿\d０-９\-‐―—\u200B-\u200D\uFEFF]'), '');
+    result = result.replaceAll(RegExp(r"""[。、！？!?,.\s\n\r　・①-⑳㉑-㊿\d０-９\-‐―—\u200B-\u200D\uFEFF「」『』【】〔〕〈〉《》［］｛｝＜＞\[\]{}<>""''`’]"""), '');
     result = _fullWidthToHalfWidth(result);
     result = result.toLowerCase();
     result = await toHiragana(result);
@@ -185,30 +227,69 @@ class TextNormalizer {
     return m < c ? m : c;
   }
 
-  /// 文字数に応じた許容最大レーベンシュタイン距離を算出する
-  /// 短い語（3文字以下）で誤判定が起きないよう制限し、長い語では最大20%の誤認識を許容します。
+  /// 文字数に応じた許容最大レーベンシュタイン距離を算出する（後方互換用）
   static int maxAllowedDistance(int length) {
-    if (length <= 3) {
-      return 0; // 3文字以下は完全一致のみ（誤認識による誤判定を防ぐ）
-    } else if (length <= 6) {
-      return 1; // 4〜6文字は1文字までの誤認識を許容 (16.7% 〜 25%)
+    return maxAllowedDistanceForLevel(length, 'normal');
+  }
+
+  /// 厳しさ設定に応じた許容最大レーベンシュタイン距離を算出する
+  static int maxAllowedDistanceForLevel(int length, String levelKey) {
+    final config = strictnessConfigs[levelKey] ?? strictnessConfigs['normal']!;
+    
+    if (length <= config.shortLengthLimit) {
+      return config.shortMaxDistance;
+    } else if (length <= config.mediumLengthLimit) {
+      return config.mediumMaxDistance;
     } else {
-      // 7文字以上は全体の20%までの誤認識を許容
-      // ただし、最低でも1文字は許容する
-      final calculated = (length * 0.20).floor();
-      return calculated > 1 ? calculated : 1;
+      final calculated = (length * config.ratio).floor();
+      // 中間の許容上限は維持するように最低値を確保する
+      final minAllowed = config.mediumMaxDistance;
+      return calculated > minAllowed ? calculated : minAllowed;
     }
+  }
+
+  /// 表記の揺れや誤認識（長音、促音・拗音の大小、濁点・半濁点の有無など）を吸収する超曖昧化処理
+  static String fuzzyNormalize(String hira) {
+    var result = hira;
+    
+    // 1. 長音記号「ー」の除去（サーバー vs サーバ などの長音の有無を統一）
+    result = result.replaceAll('ー', '');
+
+    // 2. 濁点・半濁点を除去して清音化（が -> か、ぱ -> は など）
+    final decomposed = unorm.nfd(result);
+    final noDiacritics = decomposed.replaceAll(RegExp(r'[\u3099\u309A]'), '');
+    result = unorm.nfc(noDiacritics);
+
+    // 3. 促音・拗音（小書き文字）を通常の文字（大書き）に統一（っ->つ, ゃ->や など）
+    result = result
+        .replaceAll('っ', 'つ')
+        .replaceAll('ゃ', 'や')
+        .replaceAll('ゅ', 'ゆ')
+        .replaceAll('ょ', 'よ')
+        .replaceAll('ぁ', 'あ')
+        .replaceAll('ぃ', 'い')
+        .replaceAll('ぅ', 'う')
+        .replaceAll('ぇ', 'え')
+        .replaceAll('ぉ', 'お');
+
+    return result;
   }
 
   /// ひらがなの読み同士を曖昧比較する
   /// レーベンシュタイン距離が許容範囲内であれば true を返す
-  static bool isFuzzyMatch(String hira1, String hira2) {
+  static bool isFuzzyMatch(String hira1, String hira2, {String strictness = 'normal'}) {
     if (hira1.isEmpty || hira2.isEmpty) return false;
     if (hira1 == hira2) return true;
 
-    final dist = levenshtein(hira1, hira2);
+    // 照合前の曖昧正規化（長音、促音・拗音、濁点・半濁点のゆれを吸収）
+    final norm1 = fuzzyNormalize(hira1);
+    final norm2 = fuzzyNormalize(hira2);
+
+    if (norm1 == norm2) return true;
+
+    final dist = levenshtein(norm1, norm2);
     // 正解の文字の長さ（hira2を正解と想定）を基準に閾値を決定
-    final maxDist = maxAllowedDistance(hira2.length);
+    final maxDist = maxAllowedDistanceForLevel(hira2.length, strictness);
 
     return dist <= maxDist;
   }

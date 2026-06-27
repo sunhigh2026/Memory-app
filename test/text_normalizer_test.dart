@@ -161,4 +161,43 @@ void main() {
       expect(corrected, '委託者です');
     });
   });
+
+  group('TextNormalizer.normalize (追加された記号類のテスト)', () {
+    test('「」『』などのカッコ記号が除去されること', () {
+      expect(TextNormalizer.normalize('「費用」『便益』'), '費用便益');
+      expect(TextNormalizer.normalize('【費用】[便益]'), '費用便益');
+    });
+  });
+
+  group('TextNormalizer.fuzzyNormalize (超曖昧化処理のテスト)', () {
+    test('長音、濁点・半濁点、小書きのかなが通常化されること', () {
+      expect(TextNormalizer.fuzzyNormalize('さーばー'), 'さは'); // 長音除去 + 清音化
+      expect(TextNormalizer.fuzzyNormalize('いっちゃく'), 'いつちやく'); // 促音・拗音の通常化
+      expect(TextNormalizer.fuzzyNormalize('ぱそこん'), 'はそこん'); // 半濁点清音化
+    });
+  });
+
+  group('TextNormalizer.isFuzzyMatch (照合の厳しさレベル別のテスト)', () {
+    test('やさしい（easy）モードはより大きな揺れを許容する', () {
+      // 「さーばー」 vs 「さーば」は長音除去により完全一致する
+      expect(TextNormalizer.isFuzzyMatch('さーばー', 'さーば', strictness: 'strict'), true);
+
+      // 「プロトコル」 (5文字) に対して 「プロトコ」 (4文字) は1文字違い
+      // きびしい（strict）: 5文字以下は 0 文字許容（完全一致のみ）なので false
+      expect(TextNormalizer.isFuzzyMatch('ぷろとこ', 'ぷろとこる', strictness: 'strict'), false);
+      
+      // ふつう（normal）: 4〜6文字は1文字許容なので true
+      expect(TextNormalizer.isFuzzyMatch('ぷろとこ', 'ぷろとこる', strictness: 'normal'), true);
+
+      // 「データベース」(6文字) に対して 「デタベス」 (4文字) は2文字違い（長音除外後）
+      // 「でたべす」と「データベース」の長音除外ひらがなはそれぞれ「でたべす」と「でたべす」になるため長音抜きだと一致する。
+      // なので、長音以外で2文字ずれたものでテストする：
+      // 「ぷろとこる」に対して「ぷろとこあん」は2文字違い。
+      // ふつう（normal）: 4〜6文字は1文字許容なので false
+      expect(TextNormalizer.isFuzzyMatch('ぷろとこあん', 'ぷろとこる', strictness: 'normal'), false);
+      
+      // やさしい（easy）: 4〜6文字は2文字許容なので true
+      expect(TextNormalizer.isFuzzyMatch('ぷろとこあん', 'ぷろとこる', strictness: 'easy'), true);
+    });
+  });
 }

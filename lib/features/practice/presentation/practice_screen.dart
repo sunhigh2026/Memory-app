@@ -693,11 +693,12 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
 
         // 2. ひらがな（読み）の包含および曖昧一致チェック
         try {
+          final strictness = ref.read(matchStrictnessProvider);
           final hiraText = await TextNormalizer.fullNormalize(correctedText);
           final hiraCorrect = await TextNormalizer.fullNormalize(correctWord);
           if (hiraText.isNotEmpty && hiraCorrect.isNotEmpty) {
             // 包含・曖昧一致チェック
-            if (hiraText.contains(hiraCorrect) || TextNormalizer.isFuzzyMatch(hiraText, hiraCorrect)) {
+            if (hiraText.contains(hiraCorrect) || TextNormalizer.isFuzzyMatch(hiraText, hiraCorrect, strictness: strictness)) {
               _checkAnswer(correctWord, correctWord); // 先に正解状態を確定
               await _stopVoiceInput();
               return;
@@ -804,11 +805,12 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
     if (!isCorrect) {
       // ひらがな読み曖昧比較
       try {
+        final strictness = ref.read(matchStrictnessProvider);
         final hiraAnswer = await TextNormalizer.fullNormalize(answer);
         final hiraCorrect = await TextNormalizer.fullNormalize(correct);
         if (hiraAnswer.isNotEmpty && hiraCorrect.isNotEmpty) {
           isCorrect = hiraAnswer == hiraCorrect ||
-              TextNormalizer.isFuzzyMatch(hiraAnswer, hiraCorrect);
+              TextNormalizer.isFuzzyMatch(hiraAnswer, hiraCorrect, strictness: strictness);
         }
       } catch (_) {}
     }
