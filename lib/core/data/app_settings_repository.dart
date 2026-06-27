@@ -27,6 +27,21 @@ class AppSettingsRepository {
 
   static const String _keyDailyGoal = 'dailyGoal';
   static const String _keyGoalSettingMode = 'goalSettingMode';
+  static const String _keyVadThreshold = 'vad_threshold';
+  static const String _keyVadMinSilenceDuration = 'vad_min_silence_duration';
+  static const String _keyVadSpeechPadMs = 'vad_speech_pad_ms';
+
+  // VAD初期値の定義（コメントで根拠を示す）
+  // threshold: 0.40。0.50だと静かな部屋以外で小さな声を取りこぼし、0.30未満だとノイズを過剰検知するため、中間の0.40を初期値とする。
+  static const double defaultVadThreshold = 0.40;
+  
+  // minSilenceDuration: 0.8秒。通常の会話では0.3秒で十分だが、暗記確認時は
+  // 「言葉を思い出しながら話す」ため息継ぎが多くなることを考慮し、長めの0.8秒を初期値とする。
+  static const double defaultVadMinSilenceDuration = 0.8;
+  
+  // speechPadMs: 150ms。発声開始時の子音（特に無声音の /p, t, k, s/ など）は音量が小さく、
+  // VADの検知が約100〜150ms遅れる傾向があるため、直前の150msの実音声を結合して語頭の欠けを防ぐ。
+  static const int defaultVadSpeechPadMs = 150;
 
   Future<void> setSpeechEngine(SpeechEngineType type) async {
     await _box.put(
@@ -49,6 +64,30 @@ class AppSettingsRepository {
 
   Future<void> setGoalSettingMode(String mode) async {
     await _box.put(_keyGoalSettingMode, mode);
+  }
+
+  double getVadThreshold() {
+    return _box.get(_keyVadThreshold, defaultValue: defaultVadThreshold) as double;
+  }
+
+  Future<void> setVadThreshold(double value) async {
+    await _box.put(_keyVadThreshold, value);
+  }
+
+  double getVadMinSilenceDuration() {
+    return _box.get(_keyVadMinSilenceDuration, defaultValue: defaultVadMinSilenceDuration) as double;
+  }
+
+  Future<void> setVadMinSilenceDuration(double value) async {
+    await _box.put(_keyVadMinSilenceDuration, value);
+  }
+
+  int getVadSpeechPadMs() {
+    return _box.get(_keyVadSpeechPadMs, defaultValue: defaultVadSpeechPadMs) as int;
+  }
+
+  Future<void> setVadSpeechPadMs(int value) async {
+    await _box.put(_keyVadSpeechPadMs, value);
   }
 }
 
@@ -107,5 +146,60 @@ class SpeechEngineTypeNotifier extends StateNotifier<SpeechEngineType> {
   Future<void> setEngine(SpeechEngineType type) async {
     await _repo.setSpeechEngine(type);
     state = type;
+  }
+}
+
+/// VAD しきい値の状態プロバイダ
+final vadThresholdProvider =
+    StateNotifierProvider<VadThresholdNotifier, double>((ref) {
+  final repo = ref.watch(appSettingsRepositoryProvider);
+  return VadThresholdNotifier(repo);
+});
+
+class VadThresholdNotifier extends StateNotifier<double> {
+  final AppSettingsRepository _repo;
+
+  VadThresholdNotifier(this._repo) : super(_repo.getVadThreshold());
+
+  Future<void> setValue(double value) async {
+    await _repo.setVadThreshold(value);
+    state = value;
+  }
+}
+
+/// VAD 無音判定秒数の状態プロバイダ
+final vadMinSilenceDurationProvider =
+    StateNotifierProvider<VadMinSilenceDurationNotifier, double>((ref) {
+  final repo = ref.watch(appSettingsRepositoryProvider);
+  return VadMinSilenceDurationNotifier(repo);
+});
+
+class VadMinSilenceDurationNotifier extends StateNotifier<double> {
+  final AppSettingsRepository _repo;
+
+  VadMinSilenceDurationNotifier(this._repo)
+      : super(_repo.getVadMinSilenceDuration());
+
+  Future<void> setValue(double value) async {
+    await _repo.setVadMinSilenceDuration(value);
+    state = value;
+  }
+}
+
+/// VAD 前後パディング時間（ms）の状態プロバイダ
+final vadSpeechPadMsProvider =
+    StateNotifierProvider<VadSpeechPadMsNotifier, int>((ref) {
+  final repo = ref.watch(appSettingsRepositoryProvider);
+  return VadSpeechPadMsNotifier(repo);
+});
+
+class VadSpeechPadMsNotifier extends StateNotifier<int> {
+  final AppSettingsRepository _repo;
+
+  VadSpeechPadMsNotifier(this._repo) : super(_repo.getVadSpeechPadMs());
+
+  Future<void> setValue(int value) async {
+    await _repo.setVadSpeechPadMs(value);
+    state = value;
   }
 }

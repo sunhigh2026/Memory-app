@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:record/record.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
+import '../../../core/data/app_settings_repository.dart';
 import '../domain/recognition_mode.dart';
 import 'speech_recognition_service.dart';
 import 'model_download_service.dart';
@@ -45,8 +46,9 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
   final Queue<double> _ringBuffer = Queue<double>();
 
   final ModelDownloadService _downloadService;
+  final AppSettingsRepository _settingsRepo;
 
-  SherpaSpeechRecognition(this._downloadService);
+  SherpaSpeechRecognition(this._downloadService, this._settingsRepo);
 
   @override
   String get accumulatedText => _accumulatedText;
@@ -90,13 +92,16 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
 
       _recognizer = sherpa.OfflineRecognizer(recognizerConfig);
 
+      final threshold = _settingsRepo.getVadThreshold();
+      final minSilenceDuration = _settingsRepo.getVadMinSilenceDuration();
+
       // VAD（音声活動検出器）を構成
       final vadConfig = sherpa.VadModelConfig(
         sileroVad: sherpa.SileroVadModelConfig(
           // silero_vad モデルは sherpa-onnx に内蔵
           model: '$modelDir/silero_vad.onnx',
-          threshold: 0.4,
-          minSilenceDuration: 0.8, // 0.3秒から0.8秒に延長（話の合間の途切れ防止）
+          threshold: threshold,
+          minSilenceDuration: minSilenceDuration, // 話の合間の途切れ防止
           minSpeechDuration: 0.15,
           maxSpeechDuration: 30.0,
         ),
@@ -219,8 +224,23 @@ class SherpaSpeechRecognition implements SpeechRecognitionService {
       final segment = _vad!.front();
       _vad!.pop();
 
+      // パディング設定の取得
+      final speechPadMs = _settingsRepo.getVadSpeechPadMs();
+      final padSamplesCount = (_sampleRate * (speechPadMs / 1000.0)).toInt();
+
+      // _audioBuffer から前後にパディングを確保して切り出す
+      final startIdx = math.max(0, segment.start - padSamplesCount);
+      final endIdx = math.min(
+        _audioBuffer.length,
+        segment.start + segment.samples.length + padSamplesCount,
+      );
+
+      final paddedSamples = Float32List.fromList(
+        _audioBuffer.sublist(startIdx, endIdx),
+      );
+
       // セグメントの音声を認識
-      _recognizeSegment(Float32List.fromList(segment.samples));
+      _recognizeSegment(paddedSamples);
     }
 
     // 録音中は「認識中」を表示

@@ -75,6 +75,157 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildVadTuningPanel(BuildContext context, WidgetRef ref) {
+    final threshold = ref.watch(vadThresholdProvider);
+    final minSilence = ref.watch(vadMinSilenceDurationProvider);
+    final speechPad = ref.watch(vadSpeechPadMsProvider);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.outlineDecoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '音声検出詳細設定 (VAD)',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+              TextButton.icon(
+                onPressed: () {
+                  ref
+                      .read(vadThresholdProvider.notifier)
+                      .setValue(AppSettingsRepository.defaultVadThreshold);
+                  ref
+                      .read(vadMinSilenceDurationProvider.notifier)
+                      .setValue(AppSettingsRepository.defaultVadMinSilenceDuration);
+                  ref
+                      .read(vadSpeechPadMsProvider.notifier)
+                      .setValue(AppSettingsRepository.defaultVadSpeechPadMs);
+                },
+                icon: const Icon(Icons.refresh, size: 14),
+                label: const Text('初期値', style: TextStyle(fontSize: 12)),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // しきい値 (Threshold)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('発話判定のしきい値', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              Text(
+                threshold.toStringAsFixed(2),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.primary),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: Slider(
+                  value: threshold,
+                  min: 0.1,
+                  max: 0.9,
+                  divisions: 16,
+                  onChanged: (val) {
+                    ref.read(vadThresholdProvider.notifier).setValue(double.parse(val.toStringAsFixed(2)));
+                  },
+                ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              '低いと小さな声も拾いますが雑音に弱くなります。高いと雑音を無視しますが話し始めが消えやすくなります（初期値: 0.40）。',
+              style: TextStyle(fontSize: 11, color: AppTheme.grey500),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 無音判定秒数 (minSilenceDuration)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('無音判定の秒数', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              Text(
+                '${minSilence.toStringAsFixed(1)}秒',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.primary),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: Slider(
+                  value: minSilence,
+                  min: 0.3,
+                  max: 2.0,
+                  divisions: 17,
+                  onChanged: (val) {
+                    ref.read(vadMinSilenceDurationProvider.notifier).setValue(double.parse(val.toStringAsFixed(1)));
+                  },
+                ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              '言葉を思い出しながら話す際の間隔を許容する長さです。長くすると、発話終了の判定まで余裕を持って待機します（初期値: 0.8秒）。',
+              style: TextStyle(fontSize: 11, color: AppTheme.grey500),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // パディング (speechPadMs)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('前後のパディング時間', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              Text(
+                '${speechPad}ms',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.primary),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: Slider(
+                  value: speechPad.toDouble(),
+                  min: 0,
+                  max: 500,
+                  divisions: 10,
+                  onChanged: (val) {
+                    ref.read(vadSpeechPadMsProvider.notifier).setValue(val.round());
+                  },
+                ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              '検出した発声区間の前後の実音声を結合して認識に回します。発話開始時や終了時の言葉の欠けを防ぎます（初期値: 150ms）。',
+              style: TextStyle(fontSize: 11, color: AppTheme.grey500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final clozeDensity = ref.watch(clozeDensityProvider);
@@ -206,11 +357,12 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
           ),
-          // モデル管理（SenseVoice選択時）
+          // モデル管理とVAD詳細設定（SenseVoice選択時）
           if (ref.watch(speechEngineTypeProvider) ==
               SpeechEngineType.sherpaOnnx) ...[
             const SizedBox(height: 8),
             _buildModelManagementTile(context, ref),
+            _buildVadTuningPanel(context, ref),
           ],
           const SizedBox(height: 16),
           // 復習ペース

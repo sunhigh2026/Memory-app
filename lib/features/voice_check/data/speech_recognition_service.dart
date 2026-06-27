@@ -200,7 +200,8 @@ final speechRecognitionServiceProvider =
   // Web環境ではsherpa-onnxは使用不可（FFI非対応）
   if (!kIsWeb && engineType == SpeechEngineType.sherpaOnnx) {
     final downloadService = ref.watch(modelDownloadServiceProvider);
-    final service = SherpaSpeechRecognition(downloadService);
+    final settingsRepo = ref.watch(appSettingsRepositoryProvider);
+    final service = SherpaSpeechRecognition(downloadService, settingsRepo);
     ref.onDispose(() => service.dispose());
     return service;
   } else {
