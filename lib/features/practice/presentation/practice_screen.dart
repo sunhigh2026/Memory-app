@@ -10,6 +10,7 @@ import '../data/cloze_generator.dart';
 import '../../scripts/data/scripts_repository.dart';
 import '../../voice_check/data/speech_recognition_service.dart';
 import '../../voice_check/data/speech_engine_type.dart';
+import '../../../core/data/app_settings_repository.dart';
 import '../../voice_check/domain/recognition_mode.dart';
 import '../../../models/script.dart';
 import '../../../models/cloze_word.dart';
