@@ -181,6 +181,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         .toList()
       ..sort((a, b) =>
           b.reviewOverdueDuration.compareTo(a.reviewOverdueDuration));
+    final initialCheckList = scripts
+        .where((s) => s.practiceCount == 0)
+        .toList();
+    final todayTasksCount = reviewDueList.length + initialCheckList.length;
 
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
@@ -285,12 +289,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       Row(
                         children: [
                           Expanded(
-                            child: _DashboardTile(
-                              icon: Icons.refresh_rounded,
-                              iconColor: const Color(0xFFF59E0B),
-                              label: '要復習',
-                              value: '${reviewDueList.length}件',
-                              sub: '期限切れ',
+                            child: GestureDetector(
+                              onTap: () => context.push('/review-list'),
+                              child: _DashboardTile(
+                                icon: Icons.refresh_rounded,
+                                iconColor: const Color(0xFFF59E0B),
+                                label: '今日やるべきこと',
+                                value: '$todayTasksCount件',
+                                sub: '要復習 + 初回',
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),

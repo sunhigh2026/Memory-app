@@ -1,0 +1,417 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/level_chip.dart';
+import '../../../core/widgets/rank_chip.dart';
+import '../../scripts/data/scripts_repository.dart';
+import '../../../models/script.dart';
+import 'review_session_provider.dart';
+
+class ReviewListScreen extends ConsumerWidget {
+  const ReviewListScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scripts = ref.watch(scriptsListProvider);
+
+    // 復習予定を過ぎているもの
+    final reviewDueList = scripts.where((s) => s.isReviewDue).toList()
+      ..sort((a, b) =>
+          b.reviewOverdueDuration.compareTo(a.reviewOverdueDuration));
+
+    // 未学習（初回チェック）のもの
+    final initialCheckList = scripts.where((s) => s.practiceCount == 0).toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+    final totalCount = reviewDueList.length + initialCheckList.length;
+
+    // まとめてセッションを開始する処理
+    void startContinuousSession() {
+      if (totalCount == 0) return;
+
+      final allIds = [
+        ...reviewDueList.map((s) => s.id),
+        ...initialCheckList.map((s) => s.id),
+      ];
+
+      // セッション状態を初期化
+      ref.read(reviewSessionProvider.notifier).startSession(allIds);
+
+      // 最初のスクリプトのレベル2練習画面へ遷移
+      context.pushReplacement('/practice/${allIds.first}/2');
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('今日やるべきこと'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/'),
+        ),
+      ),
+      body: Column(
+        children: [
+          // 上部のアクションエリア
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '今日取り組むテキスト',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppTheme.grey600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '合計 $totalCount 件',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        _TaskCountBadge(
+                          label: '復習',
+                          count: reviewDueList.length,
+                          color: const Color(0xFFF59E0B),
+                        ),
+                        const SizedBox(width: 8),
+                        _TaskCountBadge(
+                          label: '初回',
+                          count: initialCheckList.length,
+                          color: AppTheme.primary,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: totalCount > 0 ? startContinuousSession : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: AppTheme.grey200,
+                      disabledForegroundColor: AppTheme.grey400,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                      ),
+                    ),
+                    icon: const Icon(Icons.play_arrow_rounded, size: 24),
+                    label: const Text(
+                      'まとめて復習を開始 (Lv.2 固定)',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // リストエリア
+          Expanded(
+            child: totalCount == 0
+                ? _buildEmptyState()
+                : ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      if (reviewDueList.isNotEmpty) ...[
+                        _buildSectionHeader('復習待ち', reviewDueList.length, const Color(0xFFF59E0B)),
+                        ...reviewDueList.map((script) => _ReviewTaskCard(
+                              script: script,
+                              onTap: () {
+                                ref.read(reviewSessionProvider.notifier).startSession([script.id]);
+                                context.push('/practice/${script.id}/2');
+                              },
+                            )),
+                        const SizedBox(height: 24),
+                      ],
+                      if (initialCheckList.isNotEmpty) ...[
+                        _buildSectionHeader('初回チェック待ち', initialCheckList.length, AppTheme.primary),
+                        ...initialCheckList.map((script) => _ReviewTaskCard(
+                              script: script,
+                              onTap: () {
+                                ref.read(reviewSessionProvider.notifier).startSession([script.id]);
+                                context.push('/practice/${script.id}/2');
+                              },
+                            )),
+                      ],
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, int count, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, left: 4),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 16,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textDark,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '($count)',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppTheme.grey500,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppTheme.secondary.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.check_circle_outline_rounded,
+              size: 64,
+              color: AppTheme.secondary,
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            '今日の課題はすべて完了！',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textDark,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '素晴らしい！今日の復習と初回チェックは\nすべて完了しています。',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: AppTheme.grey500,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TaskCountBadge extends StatelessWidget {
+  final String label;
+  final int count;
+  final Color color;
+
+  const _TaskCountBadge({
+    required this.label,
+    required this.count,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 12,
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewTaskCard extends StatelessWidget {
+  final Script script;
+  final VoidCallback onTap;
+
+  const _ReviewTaskCard({
+    required this.script,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasLastPracticed = script.lastPracticedAt != null;
+    final overdueHours = script.isReviewDue && hasLastPracticed
+        ? script.reviewOverdueDuration.inHours
+        : 0;
+
+    String overdueText = '';
+    if (overdueHours > 0) {
+      final days = script.reviewOverdueDuration.inDays;
+      if (days > 0) {
+        overdueText = '期限切れ $days日経過';
+      } else {
+        overdueText = '期限切れ $overdueHours時間経過';
+      }
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      decoration: AppTheme.cardDecoration,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${script.sortOrder}. ${script.title}',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textDark,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (script.rank.isNotEmpty) ...[
+                    RankChip(rank: script.rank),
+                    const SizedBox(width: 6),
+                  ],
+                  LevelChip(level: script.currentLevel),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    hasLastPracticed ? '最終練習日: ${_formatDate(script.lastPracticedAt!)}' : '未学習',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.grey500,
+                    ),
+                  ),
+                  if (overdueText.isNotEmpty)
+                    Text(
+                      overdueText,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFFEF4444),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+              if (script.tags.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: script.tags.take(3).map((tag) {
+                    final tc = AppTheme.tagColor(tag);
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: tc.background,
+                        borderRadius:
+                            BorderRadius.circular(AppTheme.radiusSm / 2),
+                      ),
+                      child: Text(
+                        tag,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: tc.text,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+  }
+}

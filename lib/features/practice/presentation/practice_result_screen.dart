@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../scripts/data/scripts_repository.dart';
 import '../../progress/data/progress_repository.dart';
 import '../../../models/script.dart';
+import 'review_session_provider.dart';
 
 class PracticeResultScreen extends ConsumerStatefulWidget {
   final String scriptId;
@@ -14,6 +15,8 @@ class PracticeResultScreen extends ConsumerStatefulWidget {
   final int correctAnswers;
   final int durationSeconds;
   final List<String> mistakes;
+  final bool isRetry;
+  final bool isReviewSession;
 
   const PracticeResultScreen({
     super.key,
@@ -24,6 +27,8 @@ class PracticeResultScreen extends ConsumerStatefulWidget {
     required this.correctAnswers,
     this.durationSeconds = 0,
     this.mistakes = const [],
+    this.isRetry = false,
+    this.isReviewSession = false,
   });
 
   @override
@@ -94,11 +99,23 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
         durationSeconds: widget.durationSeconds,
       );
 
-      final scripts = ref.read(scriptsListProvider);
-      final script = scripts.firstWhere((s) => s.id == widget.scriptId);
-      
-      await progressRepo.updateScriptProgress(
-          script, widget.score, 'cloze', widget.level, mistakes: widget.mistakes);
+      if (!widget.isRetry) {
+        final scripts = ref.read(scriptsListProvider);
+        final script = scripts.firstWhere((s) => s.id == widget.scriptId);
+        
+        await progressRepo.updateScriptProgress(
+          script,
+          widget.score,
+          'cloze',
+          widget.level,
+          mistakes: widget.mistakes,
+          isReviewSession: widget.isReviewSession,
+        );
+
+        if (widget.isReviewSession) {
+          ref.read(reviewSessionProvider.notifier).recordFirstAttemptScore(widget.scriptId, widget.score);
+        }
+      }
       
       ref.read(scriptsListProvider.notifier).refresh();
 
@@ -147,18 +164,33 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
         ? sortedScripts[currentIndex + 1]
         : null;
 
+    final sessionState = ref.watch(reviewSessionProvider);
+    final isSessionActive = sessionState.isActive;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        context.go('/detail/${widget.scriptId}');
+        if (isSessionActive) {
+          ref.read(reviewSessionProvider.notifier).endSession();
+          context.go('/review-list');
+        } else {
+          context.go('/detail/${widget.scriptId}');
+        }
       },
       child: Scaffold(
         resizeToAvoidBottomInset: false,
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/detail/${widget.scriptId}'),
+            onPressed: () {
+              if (isSessionActive) {
+                ref.read(reviewSessionProvider.notifier).endSession();
+                context.go('/review-list');
+              } else {
+                context.go('/detail/${widget.scriptId}');
+              }
+            },
           ),
           title: const Text('練習結果'),
           automaticallyImplyLeading: false,
@@ -288,102 +320,170 @@ class _PracticeResultScreenState extends ConsumerState<PracticeResultScreen>
                 ),
                 const SizedBox(height: 32),
                 // ボタン
-                 Column(
-                   children: [
-                    Row(
+                () {
+                  if (isSessionActive) {
+                    final currentIndex = sessionState.currentIndex;
+                    final totalScripts = sessionState.scriptIds.length;
+                    final isLast = currentIndex >= totalScripts - 1;
+
+                    return Column(
                       children: [
-                        Expanded(
-                          flex: 2,
-                          child: OutlinedButton(
-                            onPressed: () =>
-                                context.go('/detail/${widget.scriptId}'),
-                            child: const Text('詳細に戻る'),
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  ref.read(reviewSessionProvider.notifier).endSession();
+                                  context.go('/review-list');
+                                },
+                                child: const Text('セッション中断'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 3,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  if (isLast) {
+                                    ref.read(reviewSessionProvider.notifier).endSession();
+                                    context.go('/review-list');
+                                  } else {
+                                    ref.read(reviewSessionProvider.notifier).next();
+                                    final nextId = sessionState.scriptIds[currentIndex + 1];
+                                    context.pushReplacement('/practice/$nextId/2');
+                                  }
+                                },
+                                child: Text(isLast ? 'セッションを完了する' : '次の要復習テキストへ'),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 3,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              final nextLevel = passed ? widget.level + 1 : widget.level;
-                              if (nextLevel >= 5) {
+                        if (widget.level == 2 && widget.mistakes.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
                                 context.pushReplacement(
-                                    '/voice-check/${widget.scriptId}/5');
-                              } else {
-                                context.pushReplacement(
-                                    '/practice/${widget.scriptId}/$nextLevel');
-                              }
-                            },
-                             child: Text(passed ? '次のレベル（Lv.${widget.level + 1}）へ' : 'もう一度'),
+                                  '/practice/${widget.scriptId}/2',
+                                  extra: {
+                                    'retryWords': widget.mistakes,
+                                    'isRetry': true,
+                                    'isReviewSession': true,
+                                  },
+                                );
+                              },
+                              icon: const Icon(Icons.replay),
+                              label: const Text('自信ない・わからないを復習（Lv.2)'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ],
-                    ),
-                     const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () => _showLevelSelectionSheet(context),
-                        icon: const Icon(Icons.swap_vert, size: 18),
-                        label: const Text('レベルを変更して再チャレンジ'),
-                      ),
-                    ),
-                    if (widget.level == 2 && widget.mistakes.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            context.pushReplacement(
-                              '/practice/${widget.scriptId}/2',
-                              extra: {'retryWords': widget.mistakes},
-                            );
-                          },
-                          icon: const Icon(Icons.replay),
-                          label: const Text('自信ない・わからないを復習（Lv.2)'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
+                    );
+                  } else {
+                    return Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: OutlinedButton(
+                                onPressed: () =>
+                                    context.go('/detail/${widget.scriptId}'),
+                                child: const Text('詳細に戻る'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 3,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  final nextLevel = passed ? widget.level + 1 : widget.level;
+                                  if (nextLevel >= 5) {
+                                    context.pushReplacement(
+                                        '/voice-check/${widget.scriptId}/5');
+                                  } else {
+                                    context.pushReplacement(
+                                        '/practice/${widget.scriptId}/$nextLevel');
+                                  }
+                                },
+                                child: Text(passed ? '次のレベル（Lv.${widget.level + 1}）へ' : 'もう一度'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _showLevelSelectionSheet(context),
+                            icon: const Icon(Icons.swap_vert, size: 18),
+                            label: const Text('レベルを変更して再チャレンジ'),
                           ),
                         ),
-                      ),
-                    ],
-                    if (nextScript != null && passed) ...[
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            context.pushReplacement(
-                                '/practice/${nextScript.id}/${widget.level}');
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.secondary,
-                            foregroundColor: Colors.white,
+                        if (widget.level == 2 && widget.mistakes.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                context.pushReplacement(
+                                  '/practice/${widget.scriptId}/2',
+                                  extra: {'retryWords': widget.mistakes},
+                                );
+                              },
+                              icon: const Icon(Icons.replay),
+                              label: const Text('自信ない・わからないを復習（Lv.2)'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
                           ),
-                           child: Text('次の問題（No.${nextScript.sortOrder}）へ'),
-                        ),
-                      ),
-                    ],
-                    if (!passed && widget.level > 1) ...[
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            context.pushReplacement(
-                                '/practice/${widget.scriptId}/${widget.level - 1}');
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.grey600,
-                            foregroundColor: Colors.white,
+                        ],
+                        if (nextScript != null && passed) ...[
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                context.pushReplacement(
+                                    '/practice/${nextScript.id}/${widget.level}');
+                              },
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.secondary,
+                                  foregroundColor: Colors.white,
+                              ),
+                              child: Text('次の問題（No.${nextScript.sortOrder}）へ'),
+                            ),
                           ),
-                          child: const Text('レベルを下げて再チャレンジ'),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+                        ],
+                        if (!passed && widget.level > 1) ...[
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                context.pushReplacement(
+                                    '/practice/${widget.scriptId}/${widget.level - 1}');
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.grey600,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('レベルを下げて再チャレンジ'),
+                            ),
+                          ),
+                        ],
+                      ],
+                    );
+                  }
+                }(),
               ],
             ),
           ),

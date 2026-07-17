@@ -72,6 +72,7 @@ class ProgressRepository {
     String mode, 
     int level, {
     List<String> mistakes = const [],
+    bool isReviewSession = false,
   }) async {
     script.practiceCount++;
     script.lastPracticedAt = DateTime.now();
@@ -97,7 +98,7 @@ class ProgressRepository {
       script.currentLevel++;
     }
 
-    // 間違えた単語のカウントを増やす
+    // 間間違えた単語のカウントを増やす
     if (mistakes.isNotEmpty) {
       final map = Map<String, int>.from(script.mistakeWords ?? {});
       for (final word in mistakes) {
@@ -107,7 +108,33 @@ class ProgressRepository {
     }
 
     // スケジュール更新
-    if (script.isTargetDateMode) {
+    if (isReviewSession && score < 100.0) {
+      // 連続復習セッションで不合格（100%未満）の場合：翌日午前6時
+      final now = DateTime.now();
+      final tomorrow = now.add(const Duration(days: 1));
+      final nextReviewDate = DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 6, 0, 0);
+
+      script.nextReviewAt = nextReviewDate;
+      script.intervalDays = 1.0; // 復習間隔を1日にリセット
+
+      // SM-2の易しさ係数(EF)を更新
+      final srResult = SpacedRepetition.calculate(
+        score: score,
+        currentInterval: script.intervalDays,
+        currentEaseFactor: script.easeFactor,
+        pace: script.reviewPace,
+        rank: script.rank,
+      );
+      script.easeFactor = srResult.easeFactor;
+
+      if (script.isTargetDateMode) {
+        if (script.scheduleIndex + 1 < script.generatedSchedule.length) {
+          script.generatedSchedule.insert(script.scheduleIndex + 1, nextReviewDate);
+        } else {
+          script.generatedSchedule.add(nextReviewDate);
+        }
+      }
+    } else if (script.isTargetDateMode) {
       // 本番日モード: generatedSchedule に従う
       if (score >= 85) {
         script.scheduleIndex = (script.scheduleIndex + 1)
@@ -116,7 +143,7 @@ class ProgressRepository {
         // 不合格: 翌日を臨時復習日として挿入
         final tomorrow = DateTime.now().add(const Duration(days: 1));
         final tomorrowDate =
-            DateTime(tomorrow.year, tomorrow.month, tomorrow.day);
+            DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 6, 0, 0); // 翌日午前6時に設定
         if (script.scheduleIndex + 1 < script.generatedSchedule.length) {
           script.generatedSchedule
               .insert(script.scheduleIndex + 1, tomorrowDate);

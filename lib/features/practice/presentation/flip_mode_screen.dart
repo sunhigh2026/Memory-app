@@ -8,9 +8,9 @@ import '../../../core/widgets/rank_chip.dart';
 import '../../../core/widgets/level_chip.dart';
 import '../data/cloze_generator.dart';
 import '../../scripts/data/scripts_repository.dart';
-import '../../progress/data/progress_repository.dart';
 import '../../../models/script.dart';
 import '../../../models/cloze_word.dart';
+import 'review_session_provider.dart';
 
 enum EvaluationType {
   correct,   // 覚えてる
@@ -98,11 +98,16 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
   }
 
   Future<bool> _showExitConfirmationDialog() async {
+    final sessionState = ref.read(reviewSessionProvider);
+    final isReviewSession = sessionState.isActive;
+
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('練習の中止'),
-        content: const Text('現在の練習を中止して詳細画面に戻りますか？\n（進捗は保存されません）'),
+        title: Text(isReviewSession ? 'セッションの中断' : '練習の中止'),
+        content: Text(isReviewSession
+            ? '連続復習セッションを中断して一覧画面に戻りますか？\n（この問題の進捗は保存されません）'
+            : '現在の練習を中止して詳細画面に戻りますか？\n（進捗は保存されません）'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -114,7 +119,7 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
               backgroundColor: AppTheme.error,
               foregroundColor: Colors.white,
             ),
-            child: const Text('中止する'),
+            child: Text(isReviewSession ? '中断する' : '中止する'),
           ),
         ],
       ),
@@ -181,22 +186,9 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
         ? 0.0
         : (scoreSum / _clozeWords.length) * 100;
 
-    final progressRepo = ref.read(progressRepositoryProvider);
-    await progressRepo.addSession(
-      scriptId: _script.id,
-      mode: 'cloze',
-      level: 2,
-      score: score,
-      durationSeconds: duration,
-    );
-    await progressRepo.updateScriptProgress(
-      _script,
-      score,
-      'cloze',
-      2,
-      mistakes: mistakes,
-    );
-    ref.read(scriptsListProvider.notifier).refresh();
+    final sessionState = ref.read(reviewSessionProvider);
+    final isReviewSession = sessionState.isActive;
+    final isRetry = widget.retryWords != null && widget.retryWords!.isNotEmpty;
 
     if (mounted) {
       context.pushReplacement('/practice-result', extra: {
@@ -207,6 +199,8 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
         'correctAnswers': _correctCount,
         'durationSeconds': duration,
         'mistakes': mistakes,
+        'isRetry': isRetry,
+        'isReviewSession': isReviewSession,
       });
     }
   }
@@ -229,7 +223,13 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
         if (didPop) return;
         final shouldPop = await _showExitConfirmationDialog();
         if (shouldPop && context.mounted) {
-          context.go('/detail/${widget.scriptId}');
+          final sessionState = ref.read(reviewSessionProvider);
+          if (sessionState.isActive) {
+            ref.read(reviewSessionProvider.notifier).endSession();
+            context.go('/review-list');
+          } else {
+            context.go('/detail/${widget.scriptId}');
+          }
         }
       },
       child: Scaffold(
@@ -239,7 +239,13 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
             onPressed: () async {
               final shouldPop = await _showExitConfirmationDialog();
               if (shouldPop && context.mounted) {
-                context.go('/detail/${widget.scriptId}');
+                final sessionState = ref.read(reviewSessionProvider);
+                if (sessionState.isActive) {
+                  ref.read(reviewSessionProvider.notifier).endSession();
+                  context.go('/review-list');
+                } else {
+                  context.go('/detail/${widget.scriptId}');
+                }
               }
             },
           ),

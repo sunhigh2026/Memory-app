@@ -8,6 +8,7 @@ import '../features/scripts/presentation/script_detail_screen.dart';
 import '../features/practice/presentation/practice_screen.dart';
 import '../features/practice/presentation/practice_result_screen.dart';
 import '../features/practice/presentation/flip_mode_screen.dart';
+import '../features/practice/presentation/review_list_screen.dart';
 
 
 
@@ -61,6 +62,11 @@ final _router = GoRouter(
           _fadePage(context, state, const HomeScreen()),
     ),
     GoRoute(
+      path: '/review-list',
+      pageBuilder: (context, state) =>
+          _fadePage(context, state, const ReviewListScreen()),
+    ),
+    GoRoute(
       path: '/add',
       pageBuilder: (context, state) =>
           _slideFadePage(context, state, const ScriptAddScreen()),
@@ -111,6 +117,8 @@ final _router = GoRouter(
             correctAnswers: extra['correctAnswers'] as int,
             durationSeconds: extra['durationSeconds'] as int? ?? 0,
             mistakes: (extra['mistakes'] as List<dynamic>?)?.cast<String>() ?? const [],
+            isRetry: extra['isRetry'] as bool? ?? false,
+            isReviewSession: extra['isReviewSession'] as bool? ?? false,
           ),
         );
       },
