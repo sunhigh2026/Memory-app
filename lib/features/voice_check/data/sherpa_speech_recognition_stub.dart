@@ -3,10 +3,11 @@
 import '../domain/recognition_mode.dart';
 import 'speech_recognition_service.dart';
 import 'model_download_service.dart';
+import '../../../core/data/app_settings_repository.dart';
 
 /// Web環境用のダミー実装（sherpa-onnxはWeb非対応）
 class SherpaSpeechRecognition implements SpeechRecognitionService {
-  SherpaSpeechRecognition(ModelDownloadService downloadService);
+  SherpaSpeechRecognition(ModelDownloadService downloadService, AppSettingsRepository settingsRepo);
 
   @override
   String get accumulatedText => '';
