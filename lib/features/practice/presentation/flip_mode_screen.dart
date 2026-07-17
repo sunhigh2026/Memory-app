@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/rank_chip.dart';
+import '../../../core/widgets/level_chip.dart';
 import '../data/cloze_generator.dart';
 import '../../scripts/data/scripts_repository.dart';
 import '../../progress/data/progress_repository.dart';
@@ -244,7 +245,7 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
           ),
           title: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child: Text('${_script.sortOrder}. ${_script.title} (Lv.2)'),
+            child: Text('${_script.sortOrder}. ${_script.title}'),
           ),
           actions: [
             Center(
@@ -310,6 +311,7 @@ class _FlipModeScreenState extends ConsumerState<FlipModeScreen> {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       RankChip(rank: _script.rank),
+                      LevelChip(level: 2),
                       ..._script.tags.map((tag) {
                         final colors = AppTheme.tagColor(tag);
                         return Container(

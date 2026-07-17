@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/rank_chip.dart';
+import '../../../core/widgets/level_chip.dart';
 import '../data/scripts_repository.dart';
 import '../../tts/presentation/tts_player_widget.dart';
 import '../../voice_check/data/allowed_pairs_repository.dart';
@@ -73,7 +74,7 @@ class ScriptDetailScreen extends ConsumerWidget {
                 runSpacing: 6,
                 children: [
                   RankChip(rank: script.rank),
-                  _LevelChip(level: script.currentLevel),
+                  LevelChip(level: script.currentLevel),
                   _InfoChip(
                     icon: Icons.repeat,
                     label: '${script.practiceCount}回練習',
@@ -938,64 +939,6 @@ class _AllowedPairsSection extends ConsumerWidget {
 }
 
 
-
-Color _levelColor(int level) {
-  switch (level) {
-    case 0:
-      return const Color(0xFF9E9E9E); // グレー
-    case 1:
-      return const Color(0xFFF59E0B); // アンバー
-    case 2:
-      return const Color(0xFF9C27B0); // パープル
-    case 3:
-      return const Color(0xFF3949AB); // インディゴ
-    case 4:
-      return const Color(0xFF00897B); // ティール
-    case 5:
-    case 6:
-    case 7:
-    case 8:
-    default:
-      return const Color(0xFFD4AF37); // ゴールド
-  }
-}
-
-class _LevelChip extends StatelessWidget {
-  final int level;
-
-  const _LevelChip({required this.level});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _levelColor(level);
-    return Semantics(
-      label: 'Level $level',
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-          border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.bar_chart, size: 14, color: color),
-            const SizedBox(width: 4),
-            Text(
-              'Level $level',
-              style: TextStyle(
-                fontSize: 12,
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // タグ専用チップ（タグ名で色分け）
 class _TagChip extends StatelessWidget {

@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/text_normalizer.dart';
 import '../../../core/widgets/animations/shake_widget.dart';
 import '../../../core/widgets/rank_chip.dart';
+import '../../../core/widgets/level_chip.dart';
 import '../data/cloze_generator.dart';
 import '../../scripts/data/scripts_repository.dart';
 import '../../voice_check/data/speech_recognition_service.dart';
@@ -232,6 +233,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     RankChip(rank: _script.rank),
+                    LevelChip(level: widget.level),
                     ..._script.tags.map((tag) {
                       final colors = AppTheme.tagColor(tag);
                       return Container(
