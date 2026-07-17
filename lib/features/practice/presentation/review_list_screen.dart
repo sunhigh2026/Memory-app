@@ -44,7 +44,7 @@ class ReviewListScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('今日やるべきこと'),
+        title: const Text('今日の学習'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/'),
@@ -309,20 +309,15 @@ class _ReviewTaskCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasLastPracticed = script.lastPracticedAt != null;
-    final overdueHours = script.isReviewDue && hasLastPracticed
-        ? script.reviewOverdueDuration.inHours
-        : 0;
+    final lastPracticed = script.lastPracticedAt != null
+        ? _timeAgo(script.lastPracticedAt!)
+        : '未学習';
+    final progress = script.progressPercent;
 
-    String overdueText = '';
-    if (overdueHours > 0) {
-      final days = script.reviewOverdueDuration.inDays;
-      if (days > 0) {
-        overdueText = '期限切れ $days日経過';
-      } else {
-        overdueText = '期限切れ $overdueHours時間経過';
-      }
-    }
+    // 期限切れ情報の計算
+    final overdueDays = script.reviewOverdueDuration.inDays;
+    final overdueText = overdueDays > 0 ? '$overdueDays日経過' : '今日';
+    final badgeColor = overdueDays >= 3 ? AppTheme.error : const Color(0xFFF59E0B);
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -341,9 +336,8 @@ class _ReviewTaskCard extends StatelessWidget {
                     child: Text(
                       '${script.sortOrder}. ${script.title}',
                       style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textDark,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -354,32 +348,44 @@ class _ReviewTaskCard extends StatelessWidget {
                     const SizedBox(width: 6),
                   ],
                   LevelChip(level: script.currentLevel),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    hasLastPracticed ? '最終練習日: ${_formatDate(script.lastPracticedAt!)}' : '未学習',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.grey500,
-                    ),
-                  ),
-                  if (overdueText.isNotEmpty)
-                    Text(
-                      overdueText,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFFEF4444),
-                        fontWeight: FontWeight.w600,
+                  const SizedBox(width: 6),
+                  // 初回チェック待ちか復習待ちかのステータスバッジ
+                  if (script.practiceCount == 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary,
+                        borderRadius: BorderRadius.circular(AppTheme.radiusSm / 2),
+                      ),
+                      child: const Text(
+                        '初回',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    )
+                  else if (script.isReviewDue)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: badgeColor,
+                        borderRadius: BorderRadius.circular(AppTheme.radiusSm / 2),
+                      ),
+                      child: Text(
+                        overdueText,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                 ],
               ),
               if (script.tags.isNotEmpty) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Wrap(
                   spacing: 4,
                   runSpacing: 4,
@@ -404,6 +410,43 @@ class _ReviewTaskCard extends StatelessWidget {
                   }).toList(),
                 ),
               ],
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: progress / 100,
+                  backgroundColor: AppTheme.grey200,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    _levelColor(script.currentLevel),
+                  ),
+                  minHeight: 6,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    script.currentLevel >= 4
+                        ? 'ベストスコア: ${script.bestVoiceScore.toStringAsFixed(0)}%'
+                        : script.lastPracticedAt == null
+                            ? '未学習'
+                            : '最終学習: $lastPracticed',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.grey500,
+                    ),
+                  ),
+                  Text(
+                    '${progress.toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _levelColor(script.currentLevel),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -411,7 +454,34 @@ class _ReviewTaskCard extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+  Color _levelColor(int level) {
+    switch (level) {
+      case 0:
+        return AppTheme.grey500;
+      case 1:
+        return AppTheme.accent;
+      case 2:
+        return const Color(0xFF9C27B0);
+      case 3:
+        return AppTheme.primary;
+      case 4:
+        return AppTheme.secondary;
+      case 5:
+      case 6:
+      case 7:
+      case 8:
+        return AppTheme.levelGold;
+      default:
+        return AppTheme.primary;
+    }
+  }
+
+  String _timeAgo(DateTime dateTime) {
+    final diff = DateTime.now().difference(dateTime);
+    if (diff.inMinutes < 1) return 'たった今';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}分前';
+    if (diff.inHours < 24) return '${diff.inHours}時間前';
+    if (diff.inDays < 7) return '${diff.inDays}日前';
+    return '${(diff.inDays / 7).floor()}週間前';
   }
 }

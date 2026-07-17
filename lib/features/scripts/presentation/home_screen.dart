@@ -294,7 +294,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               child: _DashboardTile(
                                 icon: Icons.refresh_rounded,
                                 iconColor: const Color(0xFFF59E0B),
-                                label: '今日やるべきこと',
+                                label: '今日の学習',
                                 value: '$todayTasksCount件',
                                 sub: '要復習 + 初回',
                               ),
