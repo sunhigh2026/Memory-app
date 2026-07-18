@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/level_chip.dart';
-import '../../../core/widgets/rank_chip.dart';
 import '../../scripts/data/scripts_repository.dart';
 import '../../../models/script.dart';
 import 'review_session_provider.dart';
@@ -416,18 +414,18 @@ class _ReviewTaskCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   if (script.rank.isNotEmpty) ...[
-                    RankChip(rank: script.rank),
+                    _buildRankBadge(script.rank),
                     const SizedBox(width: 6),
                   ],
-                  LevelChip(level: script.currentLevel),
-                  const SizedBox(width: 6),
+                  _buildLevelBadge(script.currentLevel),
                   // 初回チェック待ちか復習待ちかのステータスバッジ
-                  if (script.practiceCount == 0)
+                  if (script.practiceCount == 0) ...[
+                    const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                       decoration: BoxDecoration(
                         color: AppTheme.primary,
-                        borderRadius: BorderRadius.circular(AppTheme.radiusSm / 2),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                       ),
                       child: const Text(
                         '初回',
@@ -437,13 +435,14 @@ class _ReviewTaskCard extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                    )
-                  else if (script.isReviewDue)
+                    ),
+                  ] else if (script.isReviewDue) ...[
+                    const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                       decoration: BoxDecoration(
                         color: badgeColor,
-                        borderRadius: BorderRadius.circular(AppTheme.radiusSm / 2),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                       ),
                       child: Text(
                         overdueText,
@@ -454,6 +453,7 @@ class _ReviewTaskCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                  ],
                 ],
               ),
               if (script.tags.isNotEmpty) ...[
@@ -522,6 +522,68 @@ class _ReviewTaskCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // ランクバッジ（色分け）- HomeScreenと完全統一
+  Widget _buildRankBadge(String rank) {
+    Color color;
+    switch (rank) {
+      case 'S':
+        color = const Color(0xFFD4AF37); // ゴールド
+        break;
+      case 'A':
+        color = AppTheme.primary; // インディゴ
+        break;
+      case 'B':
+        color = AppTheme.secondary; // ティール
+        break;
+      case 'C':
+      default:
+        color = AppTheme.grey500; // グレー
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
+      ),
+      child: Text(
+        rank,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  // レベルバッジ（色分け）- HomeScreenと完全統一
+  Widget _buildLevelBadge(int level) {
+    final color = _levelColor(level);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.local_fire_department, size: 12, color: Colors.white),
+          const SizedBox(width: 2),
+          Text(
+            'Lv.$level',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
