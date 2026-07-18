@@ -8,31 +8,57 @@ import '../../scripts/data/scripts_repository.dart';
 import '../../../models/script.dart';
 import 'review_session_provider.dart';
 
-class ReviewListScreen extends ConsumerWidget {
+class ReviewListScreen extends ConsumerStatefulWidget {
   const ReviewListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ReviewListScreen> createState() => _ReviewListScreenState();
+}
+
+class _ReviewListScreenState extends ConsumerState<ReviewListScreen> {
+  final Set<String> _selectedTags = {};
+
+  @override
+  Widget build(BuildContext context) {
     final scripts = ref.watch(scriptsListProvider);
 
-    // 復習予定を過ぎているもの
-    final reviewDueList = scripts.where((s) => s.isReviewDue).toList()
+    // 全ての復習予定を過ぎているものと未学習のもの
+    final rawReviewDueList = scripts.where((s) => s.isReviewDue).toList();
+    final rawInitialCheckList = scripts.where((s) => s.practiceCount == 0).toList();
+
+    // 今日取り組むべきテキストに関連するすべてのタグを抽出
+    final availableTags = <String>{};
+    for (final s in rawReviewDueList) {
+      availableTags.addAll(s.tags);
+    }
+    for (final s in rawInitialCheckList) {
+      availableTags.addAll(s.tags);
+    }
+    final sortedAvailableTags = availableTags.toList()..sort();
+
+    // タグによる絞り込みを適用
+    final filteredReviewDueList = rawReviewDueList.where((s) {
+      if (_selectedTags.isEmpty) return true;
+      return s.tags.any((t) => _selectedTags.contains(t));
+    }).toList()
       ..sort((a, b) =>
           b.reviewOverdueDuration.compareTo(a.reviewOverdueDuration));
 
-    // 未学習（初回チェック）のもの
-    final initialCheckList = scripts.where((s) => s.practiceCount == 0).toList()
+    final filteredInitialCheckList = rawInitialCheckList.where((s) {
+      if (_selectedTags.isEmpty) return true;
+      return s.tags.any((t) => _selectedTags.contains(t));
+    }).toList()
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
-    final totalCount = reviewDueList.length + initialCheckList.length;
+    final totalCount = filteredReviewDueList.length + filteredInitialCheckList.length;
 
     // まとめてセッションを開始する処理
     void startContinuousSession() {
       if (totalCount == 0) return;
 
       final allIds = [
-        ...reviewDueList.map((s) => s.id),
-        ...initialCheckList.map((s) => s.id),
+        ...filteredReviewDueList.map((s) => s.id),
+        ...filteredInitialCheckList.map((s) => s.id),
       ];
 
       // セッション状態を初期化
@@ -66,6 +92,7 @@ class ReviewListScreen extends ConsumerWidget {
               ],
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -96,19 +123,62 @@ class ReviewListScreen extends ConsumerWidget {
                       children: [
                         _TaskCountBadge(
                           label: '復習',
-                          count: reviewDueList.length,
+                          count: filteredReviewDueList.length,
                           color: const Color(0xFFF59E0B),
                         ),
                         const SizedBox(width: 8),
                         _TaskCountBadge(
                           label: '初回',
-                          count: initialCheckList.length,
+                          count: filteredInitialCheckList.length,
                           color: AppTheme.primary,
                         ),
                       ],
                     ),
                   ],
                 ),
+                if (sortedAvailableTags.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 38,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: sortedAvailableTags.length,
+                      separatorBuilder: (_, index) => const SizedBox(width: 6),
+                      itemBuilder: (context, index) {
+                        final tag = sortedAvailableTags[index];
+                        final isSelected = _selectedTags.contains(tag);
+                        final colors = AppTheme.tagColor(tag);
+                        return FilterChip(
+                          label: Text(
+                            tag,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isSelected ? colors.text : AppTheme.grey600,
+                            ),
+                          ),
+                          selected: isSelected,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          selectedColor: colors.background,
+                          backgroundColor: colors.background.withValues(alpha: 0.4),
+                          checkmarkColor: colors.text,
+                          side: BorderSide(
+                            color: isSelected ? colors.text : AppTheme.grey300,
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          onSelected: (selected) {
+                            setState(() {
+                              if (selected) {
+                                _selectedTags.add(tag);
+                              } else {
+                                _selectedTags.remove(tag);
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
@@ -145,9 +215,9 @@ class ReviewListScreen extends ConsumerWidget {
                 : ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
-                      if (reviewDueList.isNotEmpty) ...[
-                        _buildSectionHeader('復習待ち', reviewDueList.length, const Color(0xFFF59E0B)),
-                        ...reviewDueList.map((script) => _ReviewTaskCard(
+                      if (filteredReviewDueList.isNotEmpty) ...[
+                        _buildSectionHeader('復習待ち', filteredReviewDueList.length, const Color(0xFFF59E0B)),
+                        ...filteredReviewDueList.map((script) => _ReviewTaskCard(
                               script: script,
                               onTap: () {
                                 ref.read(reviewSessionProvider.notifier).startSession([script.id]);
@@ -156,9 +226,9 @@ class ReviewListScreen extends ConsumerWidget {
                             )),
                         const SizedBox(height: 24),
                       ],
-                      if (initialCheckList.isNotEmpty) ...[
-                        _buildSectionHeader('初回チェック待ち', initialCheckList.length, AppTheme.primary),
-                        ...initialCheckList.map((script) => _ReviewTaskCard(
+                      if (filteredInitialCheckList.isNotEmpty) ...[
+                        _buildSectionHeader('初回チェック待ち', filteredInitialCheckList.length, AppTheme.primary),
+                        ...filteredInitialCheckList.map((script) => _ReviewTaskCard(
                               script: script,
                               onTap: () {
                                 ref.read(reviewSessionProvider.notifier).startSession([script.id]);
@@ -238,7 +308,9 @@ class ReviewListScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '素晴らしい！今日の復習と初回チェックは\nすべて完了しています。',
+            _selectedTags.isNotEmpty
+                ? '選択したタグの課題はすべて完了しています。'
+                : '素晴らしい！今日の復習と初回チェックは\nすべて完了しています。',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
