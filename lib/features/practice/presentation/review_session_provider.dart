@@ -31,10 +31,10 @@ class ReviewSessionState {
 class ReviewSessionNotifier extends StateNotifier<ReviewSessionState> {
   ReviewSessionNotifier() : super(ReviewSessionState());
 
-  void startSession(List<String> ids) {
+  void startSession(List<String> ids, {int startIndex = 0}) {
     state = ReviewSessionState(
       scriptIds: ids,
-      currentIndex: 0,
+      currentIndex: startIndex,
       firstAttemptScores: {},
       isActive: true,
     );

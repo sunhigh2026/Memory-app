@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../../models/script.dart';
 import '../../../core/utils/text_normalizer.dart';
 import '../../progress/domain/schedule_generator.dart';
+import '../../subjects/data/subjects_repository.dart';
 
 class ScriptsRepository {
   static const String _boxName = 'scripts';
@@ -11,18 +12,33 @@ class ScriptsRepository {
 
   Box<Script> get _box => Hive.box<Script>(_boxName);
 
-  List<Script> getAll() {
-    final scripts = _box.values.toList();
-    
-    // 自動マイグレーション: 未学習なのにレベルが1以上になっているものは0に補正
-    for (final s in scripts) {
+  /// カード一覧を取得
+  /// [subjectId] が指定されている場合、その科目のカードのみを返す。
+  List<Script> getAll({String? subjectId}) {
+    final allScripts = _box.values.toList();
+
+    // 自動マイグレーション 1: 未学習なのにレベルが1以上になっているものは0に補正
+    for (final s in allScripts) {
       if (s.practiceCount == 0 && s.currentLevel > 0) {
         s.currentLevel = 0;
         s.save();
       }
     }
 
-    // 自動マイグレーション: sortOrderが0のものに連番を付与する（既存データの修復）
+    // 自動マイグレーション 2: subjectId が空のデータにデフォルト科目IDを付与
+    for (final s in allScripts) {
+      if (s.subjectId.isEmpty) {
+        s.subjectId = SubjectsRepository.defaultSubjectId;
+        s.save();
+      }
+    }
+
+    // 科目フィルタリング
+    final scripts = subjectId != null
+        ? allScripts.where((s) => s.subjectId == subjectId).toList()
+        : allScripts;
+
+    // 自動マイグレーション 3: sortOrderが0のものに連番を付与する（科目単位で修復）
     bool hasZeroOrder = false;
     for (final s in scripts) {
       if (s.sortOrder == 0) {
@@ -74,6 +90,7 @@ class ScriptsRepository {
     int sortOrder = 0,
     List<String>? pinnedClozeWords,
     String rank = 'B',
+    String? subjectId,
   }) async {
     final parentheses = TextNormalizer.parseParenthesesMode(parenthesesMode);
     final hiragana = await TextNormalizer.fullNormalize(
@@ -93,9 +110,12 @@ class ScriptsRepository {
       }
     }
 
+    final targetSubjectId = subjectId ?? SubjectsRepository.defaultSubjectId;
+
     int finalSortOrder = sortOrder;
     if (finalSortOrder == 0) {
-      final currentScripts = _box.values;
+      final currentScripts =
+          _box.values.where((s) => s.subjectId == targetSubjectId);
       if (currentScripts.isNotEmpty) {
         final maxOrder = currentScripts
             .map((s) => s.sortOrder)
@@ -120,6 +140,7 @@ class ScriptsRepository {
       sortOrder: finalSortOrder,
       pinnedClozeWords: pinnedClozeWords ?? [],
       rank: rank,
+      subjectId: targetSubjectId,
     );
     await _box.add(script);
     return script;
@@ -127,7 +148,8 @@ class ScriptsRepository {
 
   Future<void> update(Script script) async {
     // content 変更時にひらがなキャッシュを再生成
-    final parentheses = TextNormalizer.parseParenthesesMode(script.parenthesesMode);
+    final parentheses =
+        TextNormalizer.parseParenthesesMode(script.parenthesesMode);
     script.fullTextHiragana = await TextNormalizer.fullNormalize(
       script.content,
       parentheses: parentheses,
@@ -152,7 +174,16 @@ class ScriptsRepository {
     }
   }
 
-  Future<void> updateTargetDateMultiple(List<String> ids, DateTime? targetDate) async {
+  /// 指定した科目に属するカードを一括削除
+  Future<void> deleteBySubjectId(String subjectId) async {
+    final targets = _box.values.where((s) => s.subjectId == subjectId).toList();
+    for (final script in targets) {
+      await script.delete();
+    }
+  }
+
+  Future<void> updateTargetDateMultiple(
+      List<String> ids, DateTime? targetDate) async {
     for (final id in ids) {
       final script = getById(id);
       if (script != null) {
@@ -176,28 +207,36 @@ class ScriptsRepository {
     }
   }
 
-  List<String> getAllTags() {
+  List<String> getAllTags({String? subjectId}) {
     final tags = <String>{};
-    for (final script in _box.values) {
+    final scripts = getAll(subjectId: subjectId);
+    for (final script in scripts) {
       tags.addAll(script.tags);
     }
     final sorted = tags.toList()..sort();
     return sorted;
   }
 
-  int get totalCount => _box.length;
+  int getTotalCount({String? subjectId}) {
+    if (subjectId == null) return _box.length;
+    return _box.values.where((s) => s.subjectId == subjectId).length;
+  }
 
-  int get masteredCount =>
-      _box.values.where((s) => s.isMastered).length;
+  int getMasteredCount({String? subjectId}) {
+    final scripts = getAll(subjectId: subjectId);
+    return scripts.where((s) => s.isMastered).length;
+  }
 }
 
 final scriptsRepositoryProvider = Provider<ScriptsRepository>((ref) {
   return ScriptsRepository();
 });
 
-final scriptsListProvider = StateNotifierProvider<ScriptsListNotifier, List<Script>>((ref) {
+final scriptsListProvider =
+    StateNotifierProvider<ScriptsListNotifier, List<Script>>((ref) {
   final repository = ref.watch(scriptsRepositoryProvider);
-  return ScriptsListNotifier(repository);
+  final currentSubjectId = ref.watch(currentSubjectIdProvider);
+  return ScriptsListNotifier(repository, currentSubjectId);
 });
 
 // タグフィルタ用プロバイダ
@@ -214,13 +253,14 @@ final rankFilterProvider = StateProvider<Set<String>>((ref) => {});
 
 class ScriptsListNotifier extends StateNotifier<List<Script>> {
   final ScriptsRepository _repository;
+  final String _currentSubjectId;
 
-  ScriptsListNotifier(this._repository) : super([]) {
+  ScriptsListNotifier(this._repository, this._currentSubjectId) : super([]) {
     refresh();
   }
 
   void refresh() {
-    state = _repository.getAll();
+    state = _repository.getAll(subjectId: _currentSubjectId);
   }
 
   Future<Script> addScript({
@@ -232,6 +272,7 @@ class ScriptsListNotifier extends StateNotifier<List<Script>> {
     int sortOrder = 0,
     List<String>? pinnedClozeWords,
     String rank = 'B',
+    String? subjectId,
   }) async {
     final script = await _repository.add(
       title: title,
@@ -242,6 +283,7 @@ class ScriptsListNotifier extends StateNotifier<List<Script>> {
       sortOrder: sortOrder,
       pinnedClozeWords: pinnedClozeWords,
       rank: rank,
+      subjectId: subjectId ?? _currentSubjectId,
     );
     refresh();
     return script;
@@ -258,7 +300,8 @@ class ScriptsListNotifier extends StateNotifier<List<Script>> {
   }
 
   Future<void> deleteAllScripts() async {
-    await _repository.deleteAll();
+    // 現在の科目のカードのみ削除
+    await _repository.deleteBySubjectId(_currentSubjectId);
     refresh();
   }
 
@@ -267,7 +310,8 @@ class ScriptsListNotifier extends StateNotifier<List<Script>> {
     refresh();
   }
 
-  Future<void> updateTargetDateMultiple(List<String> ids, DateTime? targetDate) async {
+  Future<void> updateTargetDateMultiple(
+      List<String> ids, DateTime? targetDate) async {
     await _repository.updateTargetDateMultiple(ids, targetDate);
     refresh();
   }

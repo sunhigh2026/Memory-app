@@ -43,13 +43,14 @@ class ScriptAdapter extends TypeAdapter<Script> {
           fields[22] == null ? [] : (fields[22] as List?)?.cast<String>(),
       sortOrder: fields[23] == null ? 0 : fields[23] as int,
       rank: fields[24] == null ? 'B' : fields[24] as String,
+      subjectId: fields[25] == null ? '' : fields[25] as String,
     );
   }
 
   @override
   void write(BinaryWriter writer, Script obj) {
     writer
-      ..writeByte(25)
+      ..writeByte(26)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -99,7 +100,9 @@ class ScriptAdapter extends TypeAdapter<Script> {
       ..writeByte(23)
       ..write(obj.sortOrder)
       ..writeByte(24)
-      ..write(obj.rank);
+      ..write(obj.rank)
+      ..writeByte(25)
+      ..write(obj.subjectId);
   }
 
   @override

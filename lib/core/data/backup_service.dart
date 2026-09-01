@@ -8,10 +8,13 @@ import '../../models/practice_session.dart';
 import '../../models/tts_dictionary_entry.dart';
 import '../../models/allowed_pair.dart';
 import '../../models/cloze_word.dart';
+import '../../models/subject.dart';
+import '../../features/subjects/data/subjects_repository.dart';
 
 class BackupService {
   static Future<bool> exportBackup() async {
     try {
+      final subjectsBox = Hive.box<Subject>('subjects');
       final scriptsBox = Hive.box<Script>('scripts');
       final sessionsBox = Hive.box<PracticeSession>('practice_sessions');
       final ttsBox = Hive.box<TtsDictionaryEntry>('tts_dictionary');
@@ -19,6 +22,13 @@ class BackupService {
       final settingsBox = Hive.box('app_settings');
 
       // 1. 各ボックスのデータをMap化
+      final subjectsData = subjectsBox.values.map((s) => {
+        'id': s.id,
+        'name': s.name,
+        'createdAt': s.createdAt.toIso8601String(),
+        'sortOrder': s.sortOrder,
+      }).toList();
+
       final scriptsData = scriptsBox.values.map((s) => {
         'id': s.id,
         'title': s.title,
@@ -50,6 +60,7 @@ class BackupService {
         'pinnedClozeWords': s.pinnedClozeWords,
         'sortOrder': s.sortOrder,
         'rank': s.rank,
+        'subjectId': s.subjectId,
       }).toList();
 
       final sessionsData = sessionsBox.values.map((s) => {
@@ -87,6 +98,7 @@ class BackupService {
       final backupMap = {
         'version': 1,
         'exportedAt': DateTime.now().toIso8601String(),
+        'subjects': subjectsData,
         'scripts': scriptsData,
         'practice_sessions': sessionsData,
         'tts_dictionary': ttsData,
@@ -151,6 +163,7 @@ class BackupService {
         throw Exception('不正なバックアップファイルのバージョンです。');
       }
 
+      final subjectsBox = Hive.box<Subject>('subjects');
       final scriptsBox = Hive.box<Script>('scripts');
       final sessionsBox = Hive.box<PracticeSession>('practice_sessions');
       final ttsBox = Hive.box<TtsDictionaryEntry>('tts_dictionary');
@@ -158,6 +171,7 @@ class BackupService {
       final settingsBox = Hive.box('app_settings');
 
       // 2. ボックスのデータを一旦クリア
+      await subjectsBox.clear();
       await scriptsBox.clear();
       await sessionsBox.clear();
       await ttsBox.clear();
@@ -171,10 +185,43 @@ class BackupService {
         await settingsBox.put(entry.key, entry.value);
       }
 
+      // subjects
+      final subjectsList = backupMap['subjects'] as List? ?? [];
+      String firstSubjectId = SubjectsRepository.defaultSubjectId;
+
+      if (subjectsList.isNotEmpty) {
+        for (final item in subjectsList) {
+          final map = item as Map<String, dynamic>;
+          final subject = Subject(
+            id: map['id'],
+            name: map['name'],
+            createdAt: DateTime.parse(map['createdAt']),
+            sortOrder: map['sortOrder'] ?? 0,
+          );
+          await subjectsBox.put(subject.id, subject);
+        }
+        firstSubjectId = (subjectsList.first as Map<String, dynamic>)['id'];
+      } else {
+        // 古いバックアップ等で科目情報がない場合、デフォルト科目を自動生成
+        final defaultSubject = Subject(
+          id: SubjectsRepository.defaultSubjectId,
+          name: SubjectsRepository.defaultSubjectName,
+          createdAt: DateTime.now(),
+          sortOrder: 1,
+        );
+        await subjectsBox.put(defaultSubject.id, defaultSubject);
+        firstSubjectId = defaultSubject.id;
+      }
+
       // scripts
       final scriptsList = backupMap['scripts'] as List? ?? [];
       for (final item in scriptsList) {
         final map = item as Map<String, dynamic>;
+        final rawSubjectId = map['subjectId'] as String?;
+        final targetSubjectId = (rawSubjectId != null && rawSubjectId.isNotEmpty)
+            ? rawSubjectId
+            : firstSubjectId;
+
         final script = Script(
           id: map['id'],
           title: map['title'],
@@ -206,6 +253,7 @@ class BackupService {
           pinnedClozeWords: List<String>.from(map['pinnedClozeWords'] ?? []),
           sortOrder: map['sortOrder'] ?? 0,
           rank: map['rank'] ?? 'B',
+          subjectId: targetSubjectId,
         );
         await scriptsBox.put(script.id, script);
       }

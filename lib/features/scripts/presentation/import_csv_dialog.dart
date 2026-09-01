@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
 import '../data/scripts_repository.dart';
+import '../../subjects/data/subjects_repository.dart';
 
 class ImportCsvDialog extends ConsumerStatefulWidget {
   const ImportCsvDialog({super.key});
@@ -245,14 +246,46 @@ class _ImportCsvDialogState extends ConsumerState<ImportCsvDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final currentSubject = ref.watch(currentSubjectProvider);
+
     return AlertDialog(
-      title: const Text('CSVをインポート'),
+      title: Row(
+        children: [
+          const Icon(Icons.file_upload, size: 22),
+          const SizedBox(width: 8),
+          const Text('CSVをインポート'),
+        ],
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.blue.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.school, size: 16, color: Colors.blue),
+                const SizedBox(width: 6),
+                Text(
+                  'インポート先: ${currentSubject.name}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
           Text(_statusMessage),
           const SizedBox(height: 16),
-          if (_isImporting) const CircularProgressIndicator(),
+          if (_isImporting) const Center(child: CircularProgressIndicator()),
         ],
       ),
       actions: [

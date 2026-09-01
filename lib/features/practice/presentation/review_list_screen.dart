@@ -218,7 +218,15 @@ class _ReviewListScreenState extends ConsumerState<ReviewListScreen> {
                         ...filteredReviewDueList.map((script) => _ReviewTaskCard(
                               script: script,
                               onTap: () {
-                                ref.read(reviewSessionProvider.notifier).startSession([script.id]);
+                                final allIds = [
+                                  ...filteredReviewDueList.map((s) => s.id),
+                                  ...filteredInitialCheckList.map((s) => s.id),
+                                ];
+                                final index = allIds.indexOf(script.id);
+                                ref.read(reviewSessionProvider.notifier).startSession(
+                                  allIds,
+                                  startIndex: index >= 0 ? index : 0,
+                                );
                                 context.push('/practice/${script.id}/2');
                               },
                             )),
@@ -229,7 +237,15 @@ class _ReviewListScreenState extends ConsumerState<ReviewListScreen> {
                         ...filteredInitialCheckList.map((script) => _ReviewTaskCard(
                               script: script,
                               onTap: () {
-                                ref.read(reviewSessionProvider.notifier).startSession([script.id]);
+                                final allIds = [
+                                  ...filteredReviewDueList.map((s) => s.id),
+                                  ...filteredInitialCheckList.map((s) => s.id),
+                                ];
+                                final index = allIds.indexOf(script.id);
+                                ref.read(reviewSessionProvider.notifier).startSession(
+                                  allIds,
+                                  startIndex: index >= 0 ? index : 0,
+                                );
                                 context.push('/practice/${script.id}/2');
                               },
                             )),

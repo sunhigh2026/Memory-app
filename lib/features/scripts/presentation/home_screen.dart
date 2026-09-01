@@ -6,7 +6,7 @@ import '../data/scripts_repository.dart';
 import '../../progress/data/progress_repository.dart';
 import '../../../core/data/app_settings_repository.dart';
 import '../../../models/script.dart';
-
+import '../../subjects/data/subjects_repository.dart';
 import 'import_csv_dialog.dart';
 
 Color levelColor(int level) {
@@ -124,13 +124,117 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
+  void _showSubjectSwitchBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTheme.radiusLg)),
+      ),
+      builder: (context) {
+        final currentSubjectId = ref.watch(currentSubjectIdProvider);
+        final subjects = ref.watch(subjectsListProvider);
+        final scriptsRepo = ref.watch(scriptsRepositoryProvider);
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        '学習科目を切り替え',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textDark,
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          context.push('/settings');
+                        },
+                        icon: const Icon(Icons.settings, size: 16),
+                        label: const Text('設定へ', style: TextStyle(fontSize: 13)),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: subjects.length,
+                    itemBuilder: (context, index) {
+                      final subject = subjects[index];
+                      final isSelected = subject.id == currentSubjectId;
+                      final count =
+                          scriptsRepo.getTotalCount(subjectId: subject.id);
+
+                      return ListTile(
+                        leading: Icon(
+                          isSelected
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_off,
+                          color:
+                              isSelected ? AppTheme.primary : AppTheme.grey400,
+                        ),
+                        title: Text(
+                          subject.name,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight:
+                                isSelected ? FontWeight.bold : FontWeight.w500,
+                            color: isSelected
+                                ? AppTheme.primary
+                                : AppTheme.textDark,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'カード: $count件',
+                          style: TextStyle(
+                              fontSize: 12, color: AppTheme.grey500),
+                        ),
+                        trailing: isSelected
+                            ? const Icon(Icons.check, color: AppTheme.primary)
+                            : null,
+                        onTap: () {
+                          if (!isSelected) {
+                            ref
+                                .read(currentSubjectIdProvider.notifier)
+                                .selectSubject(subject.id);
+                            ref.read(selectedTagsProvider.notifier).state = {};
+                            ref.read(levelFilterProvider.notifier).state = {};
+                            ref.read(rankFilterProvider.notifier).state = {};
+                          }
+                          Navigator.pop(context);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final currentSubject = ref.watch(currentSubjectProvider);
     final scripts = ref.watch(scriptsListProvider);
     final progressRepo = ref.watch(progressRepositoryProvider);
     final selectedTags = ref.watch(selectedTagsProvider);
     final repo = ref.watch(scriptsRepositoryProvider);
-    final allTags = repo.getAllTags();
+    final allTags = repo.getAllTags(subjectId: currentSubject.id);
 
     final goalMode = ref.watch(goalSettingModeProvider);
     final manualGoal = ref.watch(dailyGoalProvider);
@@ -213,7 +317,45 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ],
           )
         : AppBar(
-            title: Image.asset('assets/logo_text.png', height: 40, fit: BoxFit.fitHeight),
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset('assets/logo_text.png', height: 36, fit: BoxFit.fitHeight),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                    onTap: () => _showSubjectSwitchBottomSheet(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              currentSubject.name,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          const Icon(Icons.arrow_drop_down, size: 16, color: AppTheme.primary),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
             actions: [
               IconButton(
                 icon: const Icon(Icons.edit_note),

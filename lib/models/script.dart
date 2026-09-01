@@ -80,6 +80,9 @@ class Script extends HiveObject {
   @HiveField(24, defaultValue: 'B')
   late String rank; // 出題ランク ('特A', 'A', 'B', 'C')
 
+  @HiveField(25, defaultValue: '')
+  late String subjectId; // 所属する科目ID
+
   Script({
     required this.id,
     required this.title,
@@ -106,6 +109,7 @@ class Script extends HiveObject {
     List<String>? pinnedClozeWords,
     this.sortOrder = 0,
     this.rank = 'B',
+    this.subjectId = '',
   })  : createdAt = createdAt ?? DateTime.now(),
         clozeWords = clozeWords ?? [],
         tags = tags ?? [],

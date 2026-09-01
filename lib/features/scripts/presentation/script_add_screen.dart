@@ -63,11 +63,11 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
   }
 
   void _loadScript() {
-    final scripts = ref.read(scriptsListProvider);
-    final script = scripts.firstWhere(
-      (s) => s.id == widget.scriptId,
-      orElse: () => throw Exception('Script not found'),
-    );
+    final script = ref.read(scriptsRepositoryProvider).getById(widget.scriptId!);
+    if (script == null) {
+      context.pop();
+      return;
+    }
     _titleController.text = script.title;
     _contentController.text = script.content;
     _sortOrderController.text =
@@ -529,17 +529,18 @@ class _ScriptAddScreenState extends ConsumerState<ScriptAddScreen> {
     final notifier = ref.read(scriptsListProvider.notifier);
 
     if (_isEditing) {
-      final scripts = ref.read(scriptsListProvider);
-      final script = scripts.firstWhere((s) => s.id == widget.scriptId);
-      script.title = title;
-      script.content = content;
-      script.tags = _tags;
-      script.category = _tags.isNotEmpty ? _tags.first : '';
-      script.parenthesesMode = _parenthesesMode;
-      script.sortOrder = sortOrder;
-      script.pinnedClozeWords = _pinnedClozeWords;
-      script.rank = _rank;
-      await notifier.updateScript(script);
+      final script = ref.read(scriptsRepositoryProvider).getById(widget.scriptId!);
+      if (script != null) {
+        script.title = title;
+        script.content = content;
+        script.tags = _tags;
+        script.category = _tags.isNotEmpty ? _tags.first : '';
+        script.parenthesesMode = _parenthesesMode;
+        script.sortOrder = sortOrder;
+        script.pinnedClozeWords = _pinnedClozeWords;
+        script.rank = _rank;
+        await notifier.updateScript(script);
+      }
     } else {
       await notifier.addScript(
         title: title,

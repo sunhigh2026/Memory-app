@@ -5,10 +5,12 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/data/app_settings_repository.dart';
 import '../../scripts/data/scripts_repository.dart';
+import '../../subjects/data/subjects_repository.dart';
 import '../../tts/data/tts_dictionary_repository.dart';
 import '../../voice_check/data/speech_engine_type.dart';
 import '../../voice_check/data/model_download_service.dart';
 import '../../../core/data/backup_service.dart';
+import '../../../models/subject.dart';
 
 // 設定用プロバイダ
 final clozeDensityProvider = StateProvider<int>((ref) => 15);
@@ -256,6 +258,329 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _showAddSubjectDialog(BuildContext context, WidgetRef ref) async {
+    final controller = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final created = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('新しい科目を作成'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: '科目名',
+              hintText: '例: 行政書士 憲法, 英単語 など',
+            ),
+            validator: (val) {
+              if (val == null || val.trim().isEmpty) {
+                return '科目名を入力してください';
+              }
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                Navigator.of(context).pop(true);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('作成'),
+          ),
+        ],
+      ),
+    );
+
+    if (created == true && context.mounted) {
+      final name = controller.text.trim();
+      if (name.isNotEmpty) {
+        await ref.read(subjectsListProvider.notifier).addSubject(name);
+        // フィルタのリセット
+        ref.read(selectedTagsProvider.notifier).state = {};
+        ref.read(levelFilterProvider.notifier).state = {};
+        ref.read(rankFilterProvider.notifier).state = {};
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('「$name」を作成し、選択しました')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _showEditSubjectDialog(
+      BuildContext context, WidgetRef ref, Subject subject) async {
+    final controller = TextEditingController(text: subject.name);
+    final formKey = GlobalKey<FormState>();
+
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('科目名を変更'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: '科目名',
+            ),
+            validator: (val) {
+              if (val == null || val.trim().isEmpty) {
+                return '科目名を入力してください';
+              }
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                Navigator.of(context).pop(true);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+
+    if (updated == true && context.mounted) {
+      final newName = controller.text.trim();
+      if (newName.isNotEmpty && newName != subject.name) {
+        await ref
+            .read(subjectsListProvider.notifier)
+            .updateSubjectName(subject.id, newName);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('科目名を「$newName」に変更しました')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _showDeleteSubjectDialog(
+      BuildContext context, WidgetRef ref, Subject subject) async {
+    final scriptsRepo = ref.read(scriptsRepositoryProvider);
+    final cardCount = scriptsRepo.getTotalCount(subjectId: subject.id);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('「${subject.name}」を削除'),
+        content: Text(
+          cardCount > 0
+              ? '「${subject.name}」を削除すると、この科目に登録されている $cardCount 件の暗記カードもすべて削除されます。\n本当に削除しますか？\n※この操作は取り消せません。'
+              : '「${subject.name}」を削除しますか？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: AppTheme.error,
+            ),
+            child: const Text('削除する'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      // 科目に属するカードを削除
+      await scriptsRepo.deleteBySubjectId(subject.id);
+      // 科目自体を削除
+      final deleted =
+          await ref.read(subjectsListProvider.notifier).deleteSubject(subject.id);
+      if (deleted && context.mounted) {
+        // フィルタのリセット
+        ref.read(selectedTagsProvider.notifier).state = {};
+        ref.read(levelFilterProvider.notifier).state = {};
+        ref.read(rankFilterProvider.notifier).state = {};
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('「${subject.name}」を削除しました')),
+        );
+      }
+    }
+  }
+
+  Widget _buildSubjectSection(BuildContext context, WidgetRef ref) {
+    final subjects = ref.watch(subjectsListProvider);
+    final currentSubject = ref.watch(currentSubjectProvider);
+    final currentSubjectId = ref.watch(currentSubjectIdProvider);
+    final scriptsRepo = ref.watch(scriptsRepositoryProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.outlineDecoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                    ),
+                    child: const Icon(Icons.school, color: AppTheme.primary, size: 20),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '科目一覧 (${currentSubject.name})',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              FilledButton.tonalIcon(
+                onPressed: () => _showAddSubjectDialog(context, ref),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('科目を追加', style: TextStyle(fontSize: 12)),
+                style: FilledButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // 科目一覧カードリスト
+          ...subjects.map((subject) {
+            final isSelected = subject.id == currentSubjectId;
+            final count = scriptsRepo.getTotalCount(subjectId: subject.id);
+            final mastered = scriptsRepo.getMasteredCount(subjectId: subject.id);
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: isSelected ? AppTheme.primary.withValues(alpha: 0.06) : Colors.white,
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                border: Border.all(
+                  color: isSelected ? AppTheme.primary : AppTheme.grey300,
+                  width: isSelected ? 1.5 : 1.0,
+                ),
+              ),
+              child: ListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                leading: Icon(
+                  isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                  color: isSelected ? AppTheme.primary : AppTheme.grey400,
+                  size: 22,
+                ),
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        subject.name,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                          color: isSelected ? AppTheme.primary : AppTheme.textDark,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isSelected)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text(
+                          '選択中',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                subtitle: Text(
+                  'カード: $count件 (習得済: $mastered件)',
+                  style: TextStyle(fontSize: 11, color: AppTheme.grey600),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit, size: 18),
+                      tooltip: '名前を変更',
+                      color: AppTheme.grey500,
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => _showEditSubjectDialog(context, ref, subject),
+                    ),
+                    if (subjects.length > 1)
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        tooltip: '科目を削除',
+                        color: AppTheme.error,
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => _showDeleteSubjectDialog(context, ref, subject),
+                      ),
+                  ],
+                ),
+                onTap: () {
+                  if (!isSelected) {
+                    ref.read(currentSubjectIdProvider.notifier).selectSubject(subject.id);
+                    // フィルタのリセット
+                    ref.read(selectedTagsProvider.notifier).state = {};
+                    ref.read(levelFilterProvider.notifier).state = {};
+                    ref.read(rankFilterProvider.notifier).state = {};
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('科目を「${subject.name}」に切り替えました'),
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
+                  }
+                },
+              ),
+            );
+          }),
+          const SizedBox(height: 4),
+          Text(
+            '科目を切り替えると、ホーム画面のカード一覧や復習タスク、統計情報がその科目のデータに切り替わります。',
+            style: TextStyle(fontSize: 12, color: AppTheme.grey500),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final clozeDensity = ref.watch(clozeDensityProvider);
@@ -269,6 +594,10 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // 学習科目セクション
+          const SectionHeader(title: '学習科目'),
+          _buildSubjectSection(context, ref),
+          const SizedBox(height: 16),
           // 穴埋め設定
           const SectionHeader(title: '穴埋め練習'),
           Container(
